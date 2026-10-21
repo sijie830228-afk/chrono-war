@@ -40,6 +40,7 @@ const ICONS = {
   sphere: '<circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="12" rx="10" ry="3.6" transform="rotate(-20 12 12)"/>',
   rope: '<path d="M9 15l6-6M10.2 6.2l1-1a4 4 0 0 1 5.7 5.6l-1 1M13.8 17.8l-1 1a4 4 0 0 1-5.7-5.6l1-1"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  fullscreen: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
   filter: '<path d="M3.5 5h17l-6.5 8v6l-4-2v-4z"/>',
   sort: '<path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/>',
   up: '<path d="M12 20V5M6 11l6-6 6 6"/>',
