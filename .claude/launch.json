@@ -1,0 +1,31 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sandbox",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\claude\\C--Users-User-Desktop-----\\1e172512-b812-4653-addc-59944d3674f0\\scratchpad\\serve.ps1",
+        "-Root",
+        "C:\\Users\\User\\Desktop\\時序之戰"
+      ],
+      "port": 8765
+    },
+    {
+      "name": "static-mac",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--bind",
+        "127.0.0.1"
+      ],
+      "port": 8766
+    }
+  ]
+}

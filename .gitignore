@@ -1,0 +1,10 @@
+# macOS / Windows
+.DS_Store
+*.lnk
+
+# 安裝檔（太大，不屬於專案）
+*.msi
+*.msix
+
+# Claude Code 本機設定
+.claude/settings.local.json

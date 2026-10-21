@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>時序之戰</title>
+<link rel="stylesheet" href="css/style.css?v=20261022-raiden-phase2">
+</head>
+<body class="in-battle">
+<!-- 右上角圖示導覽（戰鬥時隱藏） -->
+<header id="topnav">
+  <span class="brand" data-icon="logo" data-tip="時序之戰"></span>
+  <button class="nb tab" data-view="battle" data-icon="battle" data-tip="戰鬥"></button>
+  <button class="nb tab" data-view="chars" data-icon="chars" data-tip="角色"></button>
+  <button class="nb tab" data-view="bag" data-icon="bag" data-tip="背包"></button>
+  <button class="nb tab" data-view="dungeon" data-icon="dungeon" data-tip="副本"></button>
+  <button class="nb tab" data-view="gacha" data-icon="gacha" data-tip="抽卡"></button>
+  <button class="nb tab" data-view="powers" data-icon="power" data-tip="權能"></button>
+  <button class="nb tab" data-view="save" data-icon="save" data-tip="存檔" id="saveStatus"></button>
+  <button class="nb tab" data-view="config" data-icon="settings" data-tip="設定"></button>
+  <button class="nb" data-cmd="mute" id="muteBtn" data-tip="聲音"></button>
+</header>
+
+<main id="view-battle" class="view">
+  <aside id="timeline" class="timeline"></aside>
+  <section class="field">
+    <div class="stage" aria-hidden="true"><canvas class="st-canvas"></canvas><div class="st-rain"></div><div class="st-motes"></div></div>
+    <div id="funeral" class="funeral-bg" aria-hidden="true"></div>
+    <div id="splash" class="splash none" aria-hidden="true"></div>
+    <!-- 戰鬥右上角：倍速／自動／暫停 -->
+    <div class="bctrl">
+      <button class="bc" data-cmd="speedcycle" id="speedBtn" data-tip="倍速"><b class="spdv">1×</b></button>
+      <button class="bc" data-cmd="autotoggle" id="autoBtn" data-icon="auto" data-tip="自動戰鬥"></button>
+      <button class="bc" data-cmd="pause" data-icon="pause" data-tip="暫停（Esc）"></button>
+    </div>
+    <div class="rstack"><div id="loom" class="loombox hidden"></div><div id="cashbox" class="cbox hidden" data-uid="cashbox"></div><div id="flow" class="flbox hidden"></div></div>
+    <div id="market" class="mkbox hidden"></div>
+    <div id="enemies" class="enemies-row"></div>
+    <div id="midinfo" class="midinfo"></div>
+    <div class="hud">
+      <div id="allies" class="allies-row"></div>
+      <div id="sp" class="spbox" title="戰技點"></div>
+      <div id="skills" class="skillbox"></div>
+    </div>
+  </section>
+  <aside class="side drawer" id="drawer">
+    <div class="side-tabs">
+      <button class="stab active" data-side="log">戰鬥紀錄</button>
+      <button class="stab" data-side="stats">傷害統計</button>
+      <button class="stab close" data-cmd="togglelog" data-icon="close" title="收起（L）"></button>
+    </div>
+    <div id="log" class="log"></div>
+    <div id="stats" class="stats hidden"></div>
+  </aside>
+  <!-- 暫停選單 -->
+  <div id="pausemenu" class="pausemenu hidden">
+    <div class="pm-box">
+      <div class="pm-title">暫停</div>
+      <div class="pm-grid">
+        <button class="pm-btn primary" data-cmd="resume" data-icon="play">繼續戰鬥</button>
+        <button class="pm-btn" data-cmd="restart" data-icon="restart">重新開始</button>
+        <button class="pm-btn" data-cmd="undo" data-icon="undo">撤銷上一步</button>
+        <button class="pm-btn" data-cmd="autostep" data-icon="step">自動一步</button>
+        <button class="pm-btn" data-cmd="togglelog" id="logBtn" data-icon="log">戰鬥紀錄</button>
+        <button class="pm-btn" data-view="config" data-icon="settings">完整設定</button>
+        <button class="pm-btn danger" data-cmd="leave" data-icon="exit">離開戰鬥</button>
+      </div>
+      <div class="pm-set">
+        <label title="開啟：戰鬥紀錄逐筆出現並播放特效；關閉：立即顯示結果"><input type="checkbox" data-ui="anim"> 實時結算</label>
+        <label title="自動戰鬥每一步之間的間隔">自動間隔 <input type="number" data-ui="autoInterval" min="0" step="100"> ms</label>
+        <label title="期望值：每一擊都是平均值，不會出現暴擊；隨機擲骰：依暴擊率判定，暴擊以金色大字與「暴擊」標籤顯示">暴擊計算 <select data-crit><option value="random">隨機擲骰</option><option value="expected">期望值</option></select></label>
+        <label title="動畫播放速度">動畫速度 <select data-ui="speed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+        <label title="施放終結技時播放的演出（點擊畫面可跳過）">終結技演出 <select data-ui="ultAnim"><option value="full">完整（約 10 秒）</option><option value="short">精簡（約 3 秒）</option><option value="off">關閉</option></select></label>
+      </div>
+      <div class="pm-snd sndctl"></div>
+      <p class="pm-hint">點狀態標籤看效果 · 長按角色看即時數值 · 終結技隨時可按（1–4）· Q 普攻 · E 戰技 · L 戰鬥紀錄</p>
+    </div>
+  </div>
+</main>
+
+<main id="view-chars" class="view page hidden"><div id="chars"></div></main>
+<main id="view-bag" class="view page hidden"><div id="bag"></div></main>
+<main id="view-dungeon" class="view page hidden"><div id="dungeon"></div></main>
+<main id="view-gacha" class="view page hidden"><div id="gacha"></div></main>
+<main id="view-powers" class="view page hidden"><div id="powers"></div></main>
+<main id="view-save" class="view page hidden"><div id="savepage"></div></main>
+<main id="view-config" class="view page hidden"><div id="config"></div></main>
+
+<div id="fx"><svg id="fxsvg"></svg></div>
+<div id="pop" class="pop hidden"></div>
+<div id="modal" class="modal hidden"><div id="modalBox" class="modal-box"></div></div>
+
+<!-- 敵人剪影共用的漸層 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="gE" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#20243a"/><stop offset=".42" stop-color="#07080f"/><stop offset=".62" stop-color="#090a13"/><stop offset="1" stop-color="#1a1d2e"/></linearGradient>
+    <linearGradient id="gCoat" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a2e44"/><stop offset=".45" stop-color="#0b0c16"/><stop offset="1" stop-color="#23263a"/></linearGradient>
+    <linearGradient id="gLab" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9aa0b4"/><stop offset=".45" stop-color="#4a4f62"/><stop offset="1" stop-color="#858b9e"/></linearGradient>
+    <linearGradient id="gShield" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34405e"/><stop offset="1" stop-color="#0f1422"/></linearGradient>
+    <linearGradient id="gGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff0b8"/><stop offset="1" stop-color="#b8841c"/></linearGradient>
+    <linearGradient id="gShade" x1="0" y1="0" x2="0" y2="1"><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient>
+  </defs>
+</svg>
+
+<script src="js/icons.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/art-images.js?v=20261022-raiden-phase2"></script>
+<script src="js/art.js?v=20261022-raiden-phase2"></script>
+<script src="js/stage.js"></script>
+<script src="js/relics.js"></script>
+<script src="js/quotes.js"></script>
+<script src="js/engine.js?v=20261019-combat-fx"></script>
+<script src="js/meta.js"></script>
+<script src="js/save.js"></script>
+<script src="js/chardata.js"></script>
+<script src="js/enemydata.js"></script>
+<script src="js/ultfx.js?v=20261022-raiden-phase2"></script>
+<script src="js/ultcine.js?v=20261022-raiden-phase2"></script>
+<script src="js/ultfilm.js?v=20261022-raiden-phase2"></script>
+<script src="js/ui.js?v=20261022-raiden-phase2"></script>
+<script src="js/gacha-anim.js"></script>
+<script src="js/ui-meta.js"></script>
+<script src="js/ui-save.js"></script>
+</body>
+</html>

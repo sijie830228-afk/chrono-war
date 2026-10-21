@@ -1,0 +1,1810 @@
+{
+ "format": "shixu-save",
+ "version": 2,
+ "name": "存檔 2",
+ "createdAt": 1790496973850,
+ "savedAt": 1790497009205,
+ "meta": {
+  "v": 1,
+  "nextId": 30,
+  "inv": [
+   {
+    "set": "detective",
+    "main": "hpFlat",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "cr",
+      "rolls": 2
+     },
+     {
+      "stat": "cd",
+      "rolls": 3
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     },
+     {
+      "stat": "spd",
+      "rolls": 1
+     }
+    ],
+    "id": 1,
+    "slot": "head"
+   },
+   {
+    "set": "detective",
+    "main": "atkFlat",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "cr",
+      "rolls": 1
+     },
+     {
+      "stat": "cd",
+      "rolls": 3
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 3
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 1
+     }
+    ],
+    "id": 2,
+    "slot": "hands"
+   },
+   {
+    "set": "detective",
+    "main": "cd",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "cr",
+      "rolls": 2
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "atkFlat",
+      "rolls": 1
+     }
+    ],
+    "id": 3,
+    "slot": "body"
+   },
+   {
+    "set": "detective",
+    "main": "atkPct",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "cr",
+      "rolls": 1
+     },
+     {
+      "stat": "cd",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "hpFlat",
+      "rolls": 2
+     }
+    ],
+    "id": 4,
+    "slot": "feet"
+   },
+   {
+    "set": "auction",
+    "main": "physDmg",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "cr",
+      "rolls": 1
+     },
+     {
+      "stat": "cd",
+      "rolls": 3
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 3
+     },
+     {
+      "stat": "defFlat",
+      "rolls": 1
+     }
+    ],
+    "id": 5,
+    "slot": "sphere"
+   },
+   {
+    "set": "auction",
+    "main": "atkPct",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "cr",
+      "rolls": 1
+     },
+     {
+      "stat": "cd",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 2
+     }
+    ],
+    "id": 6,
+    "slot": "rope"
+   },
+   {
+    "set": "ironfist",
+    "main": "hpFlat",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "atkPct",
+      "rolls": 3
+     },
+     {
+      "stat": "ehr",
+      "rolls": 2
+     },
+     {
+      "stat": "spd",
+      "rolls": 1
+     },
+     {
+      "stat": "cr",
+      "rolls": 2
+     }
+    ],
+    "id": 7,
+    "slot": "head"
+   },
+   {
+    "set": "ironfist",
+    "main": "atkFlat",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "atkPct",
+      "rolls": 3
+     },
+     {
+      "stat": "ehr",
+      "rolls": 2
+     },
+     {
+      "stat": "spd",
+      "rolls": 1
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 2
+     }
+    ],
+    "id": 8,
+    "slot": "hands"
+   },
+   {
+    "set": "ironfist",
+    "main": "atkPct",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "ehr",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 1
+     },
+     {
+      "stat": "cr",
+      "rolls": 2
+     },
+     {
+      "stat": "defFlat",
+      "rolls": 2
+     }
+    ],
+    "id": 9,
+    "slot": "body"
+   },
+   {
+    "set": "ironfist",
+    "main": "spd",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "atkPct",
+      "rolls": 3
+     },
+     {
+      "stat": "ehr",
+      "rolls": 2
+     },
+     {
+      "stat": "cr",
+      "rolls": 2
+     },
+     {
+      "stat": "hpFlat",
+      "rolls": 1
+     }
+    ],
+    "id": 10,
+    "slot": "feet"
+   },
+   {
+    "set": "neon",
+    "main": "physDmg",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "atkPct",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 1
+     },
+     {
+      "stat": "ehr",
+      "rolls": 2
+     },
+     {
+      "stat": "cd",
+      "rolls": 2
+     }
+    ],
+    "id": 11,
+    "slot": "sphere"
+   },
+   {
+    "set": "neon",
+    "main": "atkPct",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "ehr",
+      "rolls": 2
+     },
+     {
+      "stat": "cr",
+      "rolls": 2
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 2
+     }
+    ],
+    "id": 12,
+    "slot": "rope"
+   },
+   {
+    "set": "contract",
+    "main": "hpFlat",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "spd",
+      "rolls": 3
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 2
+     },
+     {
+      "stat": "effRes",
+      "rolls": 1
+     }
+    ],
+    "id": 13,
+    "slot": "head"
+   },
+   {
+    "set": "contract",
+    "main": "atkFlat",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "spd",
+      "rolls": 3
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 2
+     },
+     {
+      "stat": "effRes",
+      "rolls": 1
+     }
+    ],
+    "id": 14,
+    "slot": "hands"
+   },
+   {
+    "set": "contract",
+    "main": "hpPct",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 2
+     },
+     {
+      "stat": "effRes",
+      "rolls": 2
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     }
+    ],
+    "id": 15,
+    "slot": "body"
+   },
+   {
+    "set": "contract",
+    "main": "spd",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "hpPct",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 2
+     },
+     {
+      "stat": "effRes",
+      "rolls": 2
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     }
+    ],
+    "id": 16,
+    "slot": "feet"
+   },
+   {
+    "set": "tower",
+    "main": "hpPct",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 2
+     },
+     {
+      "stat": "hpFlat",
+      "rolls": 2
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     }
+    ],
+    "id": 17,
+    "slot": "sphere"
+   },
+   {
+    "set": "tower",
+    "main": "err",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 2
+     },
+     {
+      "stat": "effRes",
+      "rolls": 2
+     }
+    ],
+    "id": 18,
+    "slot": "rope"
+   },
+   {
+    "set": "scorch",
+    "main": "hpFlat",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "be",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 1
+     }
+    ],
+    "id": 19,
+    "slot": "head"
+   },
+   {
+    "set": "scorch",
+    "main": "atkFlat",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "be",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 1
+     }
+    ],
+    "id": 20,
+    "slot": "hands"
+   },
+   {
+    "set": "scorch",
+    "main": "atkPct",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "be",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 2
+     },
+     {
+      "stat": "effRes",
+      "rolls": 1
+     }
+    ],
+    "id": 21,
+    "slot": "body"
+   },
+   {
+    "set": "scorch",
+    "main": "spd",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "be",
+      "rolls": 3
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 2
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 1
+     }
+    ],
+    "id": 22,
+    "slot": "feet"
+   },
+   {
+    "set": "steel",
+    "main": "fireDmg",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "be",
+      "rolls": 3
+     },
+     {
+      "stat": "spd",
+      "rolls": 2
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     },
+     {
+      "stat": "hpFlat",
+      "rolls": 1
+     }
+    ],
+    "id": 23,
+    "slot": "sphere"
+   },
+   {
+    "set": "steel",
+    "main": "be",
+    "level": 15,
+    "subs": [
+     {
+      "stat": "spd",
+      "rolls": 3
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 2
+     },
+     {
+      "stat": "defPct",
+      "rolls": 2
+     },
+     {
+      "stat": "effRes",
+      "rolls": 1
+     }
+    ],
+    "id": 24,
+    "slot": "rope"
+   },
+   {
+    "set": "ledger",
+    "slot": "hands",
+    "main": "atkFlat",
+    "level": 0,
+    "subs": [
+     {
+      "stat": "hpPct",
+      "rolls": 1
+     },
+     {
+      "stat": "cd",
+      "rolls": 1
+     },
+     {
+      "stat": "hpFlat",
+      "rolls": 1
+     },
+     {
+      "stat": "defPct",
+      "rolls": 1
+     }
+    ],
+    "id": 25
+   },
+   {
+    "set": "ledger",
+    "slot": "head",
+    "main": "hpFlat",
+    "level": 0,
+    "subs": [
+     {
+      "stat": "spd",
+      "rolls": 1
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 1
+     },
+     {
+      "stat": "cr",
+      "rolls": 1
+     }
+    ],
+    "id": 26
+   },
+   {
+    "set": "ledger",
+    "slot": "hands",
+    "main": "atkFlat",
+    "level": 0,
+    "subs": [
+     {
+      "stat": "hpPct",
+      "rolls": 1
+     },
+     {
+      "stat": "hpFlat",
+      "rolls": 1
+     },
+     {
+      "stat": "atkPct",
+      "rolls": 1
+     }
+    ],
+    "id": 27
+   },
+   {
+    "set": "contract",
+    "slot": "body",
+    "main": "atkPct",
+    "level": 0,
+    "subs": [
+     {
+      "stat": "hpPct",
+      "rolls": 1
+     },
+     {
+      "stat": "cd",
+      "rolls": 1
+     },
+     {
+      "stat": "be",
+      "rolls": 1
+     }
+    ],
+    "id": 28
+   },
+   {
+    "set": "contract",
+    "slot": "head",
+    "main": "hpFlat",
+    "level": 0,
+    "subs": [
+     {
+      "stat": "cr",
+      "rolls": 1
+     },
+     {
+      "stat": "spd",
+      "rolls": 1
+     },
+     {
+      "stat": "hpPct",
+      "rolls": 1
+     },
+     {
+      "stat": "effRes",
+      "rolls": 1
+     }
+    ],
+    "id": 29
+   }
+  ],
+  "equip": {
+   "kane": {
+    "head": 1,
+    "hands": 2,
+    "body": 3,
+    "feet": 4,
+    "sphere": 5,
+    "rope": 6
+   },
+   "longzhao": {
+    "head": 7,
+    "hands": 8,
+    "body": 9,
+    "feet": 10,
+    "sphere": 11,
+    "rope": 12
+   },
+   "mocha": {
+    "head": 13,
+    "hands": 14,
+    "body": 15,
+    "feet": 16,
+    "sphere": 17,
+    "rope": 18
+   },
+   "alan": {
+    "head": 19,
+    "hands": 20,
+    "body": 21,
+    "feet": 22,
+    "sphere": 23,
+    "rope": 24
+   }
+  },
+  "traces": {
+   "kane": {
+    "a1": true,
+    "a2": true,
+    "a3": true,
+    "nodes": [
+     true,
+     true,
+     true
+    ]
+   },
+   "longzhao": {
+    "a1": true,
+    "a2": true,
+    "a3": true,
+    "nodes": [
+     true,
+     true,
+     true
+    ]
+   },
+   "mocha": {
+    "a1": true,
+    "a2": true,
+    "a3": true,
+    "nodes": [
+     true,
+     true,
+     true
+    ]
+   },
+   "alan": {
+    "a1": true,
+    "a2": true,
+    "a3": true,
+    "nodes": [
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  "lc": {
+   "kane": {
+    "id": "irrefutable",
+    "rank": 1
+   },
+   "longzhao": {
+    "id": "ninthRule",
+    "rank": 1
+   },
+   "mocha": {
+    "id": "clause7",
+    "rank": 1
+   },
+   "alan": {
+    "id": "lastCover",
+    "rank": 1
+   }
+  },
+  "crystals": 3600,
+  "stamina": 160,
+  "staminaTs": 1790496996877,
+  "shards": 4800,
+  "gacha": {
+   "char": {
+    "pity5": 10,
+    "pity4": 0,
+    "guar": false
+   },
+   "lc": {
+    "pity5": 10,
+    "pity4": 2,
+    "guar": false
+   },
+   "history": [
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "smallTalk",
+     "rarity": 3
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "blankCheck",
+     "rarity": 3
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "char",
+     "id": "longzhao",
+     "rarity": 4
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "silentGold",
+     "rarity": 3
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "firstClue",
+     "rarity": 3
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "firstClue",
+     "rarity": 3
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "silentGold",
+     "rarity": 3
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "firstClue",
+     "rarity": 3
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "smallTalk",
+     "rarity": 3
+    },
+    {
+     "t": 1790497004725,
+     "banner": "lc",
+     "kind": "lc",
+     "id": "smallTalk",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "char",
+     "id": "longzhao",
+     "rarity": 4
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "blankCheck",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "smallTalk",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "blankCheck",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "silentGold",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "blankCheck",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "blankCheck",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "firstClue",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "blankCheck",
+     "rarity": 3
+    },
+    {
+     "t": 1790497002419,
+     "banner": "char",
+     "kind": "lc",
+     "id": "blankCheck",
+     "rarity": 3
+    }
+   ]
+  },
+  "owned": {
+   "chars": {
+    "kane": 1,
+    "longzhao": 3,
+    "mocha": 1,
+    "alan": 1
+   },
+   "lcs": {
+    "irrefutable": 1,
+    "ninthRule": 1,
+    "clause7": 1,
+    "lastCover": 1,
+    "blankCheck": 7,
+    "firstClue": 4,
+    "silentGold": 3,
+    "smallTalk": 4
+   }
+  },
+  "drops": [
+   27,
+   28,
+   29,
+   25,
+   26
+  ],
+  "activity": [
+   {
+    "t": 1790497004725,
+    "type": "gacha",
+    "text": "金句活動躍遷「罪證確鑿」 躍遷 ×10（−1600 碎片）：4★龍爪，3★ ×9"
+   },
+   {
+    "t": 1790497002419,
+    "type": "gacha",
+    "text": "角色活動躍遷「真相只有一個」 躍遷 ×10（−1600 碎片）：4★龍爪，3★ ×9"
+   },
+   {
+    "t": 1790496997699,
+    "type": "dungeon",
+    "text": "莫卡兄弟代理事務所：消耗體力 40，獲得 冰封的帳簿・手部（攻擊力）、代理人的委任狀・軀幹（攻擊%）、代理人的委任狀・頭部（生命），妙具經驗 +300"
+   },
+   {
+    "t": 1790496996877,
+    "type": "dungeon",
+    "text": "莫卡兄弟代理事務所：消耗體力 40，獲得 冰封的帳簿・手部（攻擊力）、冰封的帳簿・頭部（生命），妙具經驗 +300"
+   },
+   {
+    "t": 1790496973850,
+    "type": "system",
+    "text": "把存檔 1 的進度複製到存檔 2，並改用存檔 2"
+   },
+   {
+    "t": 1790496965883,
+    "type": "system",
+    "text": "開始新遊戲"
+   }
+  ],
+  "createdAt": 1790496965883
+ },
+ "cfg": {
+  "team": [
+   "kane",
+   "longzhao",
+   "mocha",
+   "alan"
+  ],
+  "chars": {
+   "longzhao": {
+    "lvl": 80,
+    "baseAtk": 640,
+    "atkPct": 0,
+    "hp": 1150,
+    "def": 520,
+    "spd": 100,
+    "cr": 5,
+    "cd": 50,
+    "dmgBonus": 0,
+    "ehr": 0,
+    "effRes": 0,
+    "be": 0,
+    "err": 100,
+    "maxEnergy": 110,
+    "startEnergy": 50
+   },
+   "kane": {
+    "lvl": 80,
+    "baseAtk": 670,
+    "atkPct": 0,
+    "hp": 1150,
+    "def": 480,
+    "spd": 101,
+    "cr": 5,
+    "cd": 50,
+    "dmgBonus": 0,
+    "ehr": 0,
+    "effRes": 0,
+    "be": 0,
+    "err": 100,
+    "maxEnergy": 140,
+    "startEnergy": 50
+   },
+   "mocha": {
+    "lvl": 80,
+    "baseAtk": 560,
+    "atkPct": 0,
+    "hp": 1250,
+    "def": 560,
+    "spd": 100,
+    "cr": 5,
+    "cd": 50,
+    "dmgBonus": 0,
+    "ehr": 0,
+    "effRes": 0,
+    "be": 0,
+    "err": 100,
+    "maxEnergy": 120,
+    "startEnergy": 50
+   },
+   "alan": {
+    "lvl": 80,
+    "baseAtk": 580,
+    "atkPct": 0,
+    "hp": 1200,
+    "def": 600,
+    "spd": 102,
+    "cr": 5,
+    "cd": 50,
+    "dmgBonus": 0,
+    "ehr": 0,
+    "effRes": 0,
+    "be": 0,
+    "err": 100,
+    "maxEnergy": 120,
+    "startEnergy": 50
+   }
+  },
+  "enemies": [
+   {
+    "wave": 1,
+    "type": "thug",
+    "name": "第九街打手 A",
+    "hp": 40000,
+    "atk": 900,
+    "spd": 100,
+    "lvl": 80,
+    "tough": 30,
+    "weak": "火,冰",
+    "effRes": 10
+   },
+   {
+    "wave": 1,
+    "type": "binder",
+    "name": "鐵鍊束縛者",
+    "hp": 50000,
+    "atk": 950,
+    "spd": 108,
+    "lvl": 80,
+    "tough": 40,
+    "weak": "物理,火",
+    "effRes": 20
+   },
+   {
+    "wave": 1,
+    "type": "thug",
+    "name": "第九街打手 B",
+    "hp": 40000,
+    "atk": 900,
+    "spd": 100,
+    "lvl": 80,
+    "tough": 30,
+    "weak": "火,冰",
+    "effRes": 10
+   },
+   {
+    "wave": 2,
+    "type": "medic",
+    "name": "黑診所醫生",
+    "hp": 60000,
+    "atk": 800,
+    "spd": 110,
+    "lvl": 82,
+    "tough": 40,
+    "weak": "物理,冰",
+    "effRes": 20
+   },
+   {
+    "wave": 2,
+    "type": "boss",
+    "name": "街區頭目",
+    "hp": 250000,
+    "atk": 1400,
+    "spd": 120,
+    "lvl": 82,
+    "tough": 160,
+    "weak": "物理,火",
+    "effRes": 30
+   },
+   {
+    "wave": 2,
+    "type": "guard",
+    "name": "重裝保鑣",
+    "hp": 90000,
+    "atk": 1000,
+    "spd": 95,
+    "lvl": 82,
+    "tough": 90,
+    "weak": "冰,火",
+    "effRes": 30
+   }
+  ],
+  "rules": {
+   "critMode": "expected",
+   "resNonWeak": 20,
+   "bbImmediate": false,
+   "kaneEnhStack": false,
+   "kaneTechnique": true,
+   "useRelics": true,
+   "lacerMax": 0,
+   "enemyAttack": true,
+   "infiniteSP": false,
+   "maxCycles": 30,
+   "lzTechnique": true,
+   "mochaTechnique": true,
+   "mochaTechTarget": "kane",
+   "alanTechnique": true
+  },
+  "ui": {
+   "anim": true,
+   "speed": 1,
+   "autoInterval": 600
+  }
+ },
+ "battle": {
+  "state": {
+   "rules": {
+    "critMode": "expected",
+    "resNonWeak": 20,
+    "bbImmediate": false,
+    "kaneEnhStack": false,
+    "kaneTechnique": true,
+    "useRelics": true,
+    "lacerMax": 0,
+    "enemyAttack": true,
+    "infiniteSP": false,
+    "maxCycles": 30,
+    "lzTechnique": true,
+    "mochaTechnique": true,
+    "mochaTechTarget": "kane",
+    "alanTechnique": true
+   },
+   "units": [
+    {
+     "id": "a_kane",
+     "side": "ally",
+     "key": "kane",
+     "name": "凱恩",
+     "elem": "phys",
+     "base": {
+      "lvl": 80,
+      "baseAtk": 1252,
+      "atkPct": 1.5719,
+      "atkFlat": 371.85,
+      "hp": 3468.2736,
+      "def": 962.05,
+      "spdBase": 101,
+      "spdPct": 0,
+      "spdFlat": 16.1,
+      "cr": 0.6636,
+      "cd": 2.0225000000000004,
+      "dmgBonus": 0.489,
+      "ehr": 0,
+      "effRes": 0,
+      "be": 0,
+      "err": 1,
+      "sets": [
+       "detective2",
+       "detective4",
+       "auction2"
+      ],
+      "lc": {
+       "id": "irrefutable",
+       "rank": 1,
+       "active": true
+      },
+      "traces": {
+       "a1": true,
+       "a2": true,
+       "a3": true
+      }
+     },
+     "maxHp": 3468.2736,
+     "hp": 3468.2736,
+     "maxEnergy": 140,
+     "energy": 70,
+     "shield": 0,
+     "shieldDur": 0,
+     "stunned": false,
+     "av": 3.243230346893931,
+     "alive": true,
+     "buffs": [],
+     "pendingAdv": 0,
+     "mark": "兄友",
+     "tacit": 0,
+     "clues": 7,
+     "cover": 0,
+     "spdCache": 132.1
+    },
+    {
+     "id": "a_longzhao",
+     "side": "ally",
+     "key": "longzhao",
+     "name": "龍爪",
+     "elem": "phys",
+     "base": {
+      "lvl": 80,
+      "baseAtk": 1116,
+      "atkPct": 2.0108,
+      "atkFlat": 352.8,
+      "hp": 3173.9268,
+      "def": 889.1,
+      "spdBase": 100,
+      "spdPct": 0,
+      "spdFlat": 43.8,
+      "cr": 0.2836,
+      "cd": 0.6165999999999999,
+      "dmgBonus": 0.389,
+      "ehr": 0.6857,
+      "effRes": 0,
+      "be": 0,
+      "err": 1,
+      "sets": [
+       "ironfist2",
+       "ironfist4",
+       "neon2"
+      ],
+      "lc": {
+       "id": "ninthRule",
+       "rank": 1,
+       "active": true
+      },
+      "traces": {
+       "a1": true,
+       "a2": true,
+       "a3": true
+      }
+     },
+     "maxHp": 3173.9268,
+     "hp": 3173.9268,
+     "maxEnergy": 110,
+     "energy": 55,
+     "shield": 0,
+     "shieldDur": 0,
+     "stunned": false,
+     "av": 23.57911193868334,
+     "alive": true,
+     "buffs": [],
+     "pendingAdv": 0,
+     "mark": null,
+     "tacit": 0,
+     "clues": 0,
+     "cover": 0,
+     "spdCache": 143.8
+    },
+    {
+     "id": "a_mocha",
+     "side": "ally",
+     "key": "mocha",
+     "name": "莫卡兄弟",
+     "elem": "ice",
+     "base": {
+      "lvl": 80,
+      "baseAtk": 983,
+      "atkPct": 0.31120000000000003,
+      "atkFlat": 352.8,
+      "hp": 6217.6016,
+      "def": 1422.102,
+      "spdBase": 100,
+      "spdPct": 0.06,
+      "spdFlat": 61.6,
+      "cr": 0.05,
+      "cd": 0.5,
+      "dmgBonus": 0,
+      "ehr": 0,
+      "effRes": 0.41120000000000007,
+      "be": 0,
+      "err": 1.324,
+      "sets": [
+       "contract2",
+       "contract4",
+       "tower2"
+      ],
+      "lc": {
+       "id": "clause7",
+       "rank": 1,
+       "active": true
+      },
+      "traces": {
+       "a1": true,
+       "a2": true,
+       "a3": true
+      }
+     },
+     "maxHp": 6217.6016,
+     "hp": 6217.6016,
+     "maxEnergy": 120,
+     "energy": 60,
+     "shield": 0,
+     "shieldDur": 0,
+     "stunned": false,
+     "av": 13.703953853169466,
+     "alive": true,
+     "buffs": [],
+     "pendingAdv": 0,
+     "mark": null,
+     "tacit": 2,
+     "clues": 0,
+     "cover": 0,
+     "spdCache": 167.6
+    },
+    {
+     "id": "a_alan",
+     "side": "ally",
+     "key": "alan",
+     "name": "阿蘭",
+     "elem": "fire",
+     "base": {
+      "lvl": 80,
+      "baseAtk": 1003,
+      "atkPct": 0.921,
+      "atkFlat": 352.8,
+      "hp": 3064.2034000000003,
+      "def": 1663.8075999999999,
+      "spdBase": 102,
+      "spdPct": 0,
+      "spdFlat": 50.3,
+      "cr": 0.05,
+      "cd": 0.5,
+      "dmgBonus": 0.389,
+      "ehr": 0,
+      "effRes": 0.07780000000000001,
+      "be": 2.6555,
+      "err": 1,
+      "sets": [
+       "scorch2",
+       "scorch4",
+       "steel2"
+      ],
+      "lc": {
+       "id": "lastCover",
+       "rank": 1,
+       "active": true
+      },
+      "traces": {
+       "a1": true,
+       "a2": true,
+       "a3": true
+      }
+     },
+     "maxHp": 3064.2034000000003,
+     "hp": 3064.2034000000003,
+     "maxEnergy": 120,
+     "energy": 60,
+     "shield": 0,
+     "shieldDur": 0,
+     "stunned": false,
+     "av": 0,
+     "alive": true,
+     "buffs": [
+      {
+       "name": "戰術演繹",
+       "dur": 3,
+       "stats": {
+        "be": 0.3
+       }
+      }
+     ],
+     "pendingAdv": 0,
+     "mark": null,
+     "tacit": 0,
+     "clues": 0,
+     "cover": 0,
+     "spdCache": 152.3,
+     "ownTurns": 1
+    },
+    {
+     "id": "w0e0",
+     "side": "enemy",
+     "type": "thug",
+     "name": "第九街打手 A",
+     "base": {
+      "lvl": 80,
+      "atk": 900,
+      "spd": 100,
+      "effRes": 0.1
+     },
+     "weak": [
+      "fire",
+      "ice"
+     ],
+     "maxTough": 30,
+     "tough": 30,
+     "broken": false,
+     "maxHp": 40000,
+     "hp": 40000,
+     "shield": 0,
+     "shieldDur": 0,
+     "turns": 0,
+     "av": 54.038082731451084,
+     "alive": true,
+     "buffs": [],
+     "pendingAdv": 0,
+     "lacer": [
+      {
+       "dur": 2
+      }
+     ],
+     "bloodBreak": 0,
+     "record": 1,
+     "peek": true,
+     "suspect": false,
+     "flagrant": false,
+     "spdCache": 100
+    },
+    {
+     "id": "w0e1",
+     "side": "enemy",
+     "type": "binder",
+     "name": "鐵鍊束縛者",
+     "base": {
+      "lvl": 80,
+      "atk": 950,
+      "spd": 108,
+      "effRes": 0.2
+     },
+     "weak": [
+      "phys",
+      "fire"
+     ],
+     "maxTough": 40,
+     "tough": 40,
+     "broken": false,
+     "maxHp": 50000,
+     "hp": 50000,
+     "shield": 0,
+     "shieldDur": 0,
+     "turns": 0,
+     "av": 46.63067532404368,
+     "alive": true,
+     "buffs": [],
+     "pendingAdv": 0,
+     "lacer": [
+      {
+       "dur": 2
+      }
+     ],
+     "bloodBreak": 0,
+     "record": 1,
+     "peek": false,
+     "suspect": false,
+     "flagrant": false,
+     "spdCache": 108
+    },
+    {
+     "id": "w0e2",
+     "side": "enemy",
+     "type": "thug",
+     "name": "第九街打手 B",
+     "base": {
+      "lvl": 80,
+      "atk": 900,
+      "spd": 100,
+      "effRes": 0.1
+     },
+     "weak": [
+      "fire",
+      "ice"
+     ],
+     "maxTough": 30,
+     "tough": 30,
+     "broken": false,
+     "maxHp": 40000,
+     "hp": 40000,
+     "shield": 0,
+     "shieldDur": 0,
+     "turns": 0,
+     "av": 54.038082731451084,
+     "alive": true,
+     "buffs": [],
+     "pendingAdv": 0,
+     "lacer": [
+      {
+       "dur": 2
+      }
+     ],
+     "bloodBreak": 0,
+     "record": 1,
+     "peek": false,
+     "suspect": false,
+     "flagrant": false,
+     "spdCache": 100
+    }
+   ],
+   "sp": 4,
+   "spMax": 5,
+   "time": 45.961917268548916,
+   "extraQueue": [],
+   "phase": "input",
+   "current": "a_alan",
+   "currentExtra": false,
+   "turnNo": 1,
+   "log": [
+    {
+     "type": "sys",
+     "text": "⚔ 戰鬥開始",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "wave",
+     "text": "━━ 第 1 / 2 波 ━━",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "凱恩【觀察後再行動】：生命值最低的 第九街打手 A 獲得［管中窺豹］",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "莫卡兄弟【啟動資金】：獲得 2 默契",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "莫卡兄弟 秘技【預付訂金，該不退還】",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "凱恩 成為「被代理人」［兄友］",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "龍爪 秘技【街頭威懾】",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "第九街打手 A 獲得 裂傷（現有 1 層，記錄 1）",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "鐵鍊束縛者 獲得 裂傷（現有 1 層，記錄 1）",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "第九街打手 B 獲得 裂傷（現有 1 層，記錄 1）",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "阿蘭 秘技【戰術演繹】",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "阿蘭 行動提前 30%",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "阿蘭 擊破特攻 +30%（3回合），獲得 1 戰技點",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "凱恩 獲得 7 層線索（額外能力一）：0 → 7",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "凱恩 秘技【先行】",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "buff",
+     "text": "凱恩 行動提前 35%",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "妙具套裝 — 凱恩：偵探的放大鏡2件、偵探的放大鏡4件、地下拍賣行2件；龍爪：第九街的鐵拳2件、第九街的鐵拳4件、霓虹不夜街2件；莫卡兄弟：代理人的委任狀2件、代理人的委任狀4件、契約之塔2件；阿蘭：焦土狙擊手2件、焦土狙擊手4件、鋼骨防線2件",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "凱恩 裝備金句《不可反駁的推演》疊影 1 階",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "龍爪 裝備金句《第九街的規矩》疊影 1 階",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "莫卡兄弟 裝備金句《合約第七條》疊影 1 階",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "info",
+     "text": "阿蘭 裝備金句《掩護到最後一刻》疊影 1 階",
+     "detail": "",
+     "cycle": 1
+    },
+    {
+     "type": "turn",
+     "text": "阿蘭 的回合",
+     "detail": "",
+     "cycle": 1
+    }
+   ],
+   "stats": {},
+   "proxy": "a_kane",
+   "target": "w0e0",
+   "allyTarget": "a_kane",
+   "a2Turn": -1,
+   "waves": [
+    [
+     {
+      "wave": 1,
+      "type": "thug",
+      "name": "第九街打手 A",
+      "hp": 40000,
+      "atk": 900,
+      "spd": 100,
+      "lvl": 80,
+      "tough": 30,
+      "weak": "火,冰",
+      "effRes": 10
+     },
+     {
+      "wave": 1,
+      "type": "binder",
+      "name": "鐵鍊束縛者",
+      "hp": 50000,
+      "atk": 950,
+      "spd": 108,
+      "lvl": 80,
+      "tough": 40,
+      "weak": "物理,火",
+      "effRes": 20
+     },
+     {
+      "wave": 1,
+      "type": "thug",
+      "name": "第九街打手 B",
+      "hp": 40000,
+      "atk": 900,
+      "spd": 100,
+      "lvl": 80,
+      "tough": 30,
+      "weak": "火,冰",
+      "effRes": 10
+     }
+    ],
+    [
+     {
+      "wave": 2,
+      "type": "medic",
+      "name": "黑診所醫生",
+      "hp": 60000,
+      "atk": 800,
+      "spd": 110,
+      "lvl": 82,
+      "tough": 40,
+      "weak": "物理,冰",
+      "effRes": 20
+     },
+     {
+      "wave": 2,
+      "type": "boss",
+      "name": "街區頭目",
+      "hp": 250000,
+      "atk": 1400,
+      "spd": 120,
+      "lvl": 82,
+      "tough": 160,
+      "weak": "物理,火",
+      "effRes": 30
+     },
+     {
+      "wave": 2,
+      "type": "guard",
+      "name": "重裝保鑣",
+      "hp": 90000,
+      "atk": 1000,
+      "spd": 95,
+      "lvl": 82,
+      "tough": 90,
+      "weak": "冰,火",
+      "effRes": 30
+     }
+    ]
+   ],
+   "wave": 0
+  },
+  "activeDungeon": null,
+  "dungeonClaimed": false,
+  "battleRecorded": false
+ }
+}
