@@ -1322,8 +1322,11 @@ function sufferChargeMarkup(a) {
  * 以立繪載入時量到的頭頂位置（art.top）對齊容器上緣，保證不會削到頭頂；
  * 縮放讓「頭頂 → 腰部（胸口再往下 1.1 倍的臉胸距離）」剛好填滿容器高度。
  */
-const POP_ABOVE = 58, POP_H = 58 + 134, POP_PAD = 4;
+const POP_PAD = 4;
+// 橫向手機：卡片的立繪區縮小（與 style.css「手機橫屏適配」的 .art-pop 高度一致）
+const compactLayout = () => !!(window.matchMedia && window.matchMedia('(orientation: landscape) and (max-height: 540px)').matches);
 function popArt(key, art, blas) {
+  const POP_H = compactLayout() ? 28 + 62 : 58 + 134;
   const fy = art.face[1], by = art.bust ? Math.max(art.bust[1], fy + 0.05) : fy + 0.2;
   const top = art.top != null ? Math.min(art.top, fy) : Math.max(0, fy - 0.6 * (by - fy));
   const waist = Math.min(1, by + 1.1 * (by - fy));
@@ -2561,6 +2564,8 @@ document.addEventListener('click', ev => {
       }
       case 'redungeon': return startBattle({ dungeon: activeDungeon });
       case 'togglelog': return toggleLog();
+      case 'fullscreen': return toggleFullscreen();
+      case 'portraitok': document.body.classList.add('no-rotate-hint'); try { sessionStorage.setItem('portraitOk', '1'); } catch (e) { } return;
       case 'mute': Sound.set('muted', !Sound.pref.muted); return renderSoundCtl();
       case 'loom': if (!playing && Engine.canLoom()) run(() => Engine.loom()); return;
       case 'ulttest': {
@@ -2683,6 +2688,21 @@ document.addEventListener('keydown', ev => {
 });
 
 window.addEventListener('resize', () => { if (view === 'battle' && !playing) renderBattle(); });
+
+/* ----- 全螢幕（手機橫屏）：進入全螢幕後鎖定橫向；不支援的瀏覽器（如 iPhone Safari）不顯示按鈕 ----- */
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+if (document.fullscreenEnabled || document.webkitFullscreenEnabled) document.documentElement.classList.add('can-fs');
+function toggleFullscreen() {
+  const root = document.documentElement;
+  if (fsEl()) return (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  const req = root.requestFullscreen || root.webkitRequestFullscreen;
+  if (!req) return;
+  Promise.resolve(req.call(root, { navigationUI: 'hide' })).then(() => {
+    if (screen.orientation && screen.orientation.lock) return screen.orientation.lock('landscape');
+  }).catch(() => { });
+}
+['fullscreenchange', 'webkitfullscreenchange'].forEach(t => document.addEventListener(t, () => $('#fsBtn').classList.toggle('on', !!fsEl())));
+try { if (sessionStorage.getItem('portraitOk')) document.body.classList.add('no-rotate-hint'); } catch (e) { }
 
 // 介面音效（在各功能的點擊處理之後執行，所以能讀到更新後的狀態）
 document.addEventListener('click', ev => {

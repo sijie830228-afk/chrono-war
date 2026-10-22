@@ -2,9 +2,14 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="時序之戰">
 <title>時序之戰</title>
-<link rel="stylesheet" href="css/style.css?v=20261023-twobars">
+<link rel="stylesheet" href="css/style.css?v=20261023-merge-landscape">
 </head>
 <body class="in-battle">
 <!-- 右上角圖示導覽（戰鬥時隱藏） -->
@@ -62,6 +67,7 @@
         <button class="pm-btn" data-cmd="undo" data-icon="undo">撤銷上一步</button>
         <button class="pm-btn" data-cmd="autostep" data-icon="step">自動一步</button>
         <button class="pm-btn" data-cmd="togglelog" id="logBtn" data-icon="log">戰鬥紀錄</button>
+        <button class="pm-btn fs-only" data-cmd="fullscreen" id="fsBtn" data-icon="fullscreen">全螢幕</button>
         <button class="pm-btn" data-view="config" data-icon="settings">完整設定</button>
         <button class="pm-btn danger" data-cmd="leave" data-icon="exit">離開戰鬥</button>
       </div>
@@ -86,6 +92,19 @@
 <main id="view-save" class="view page hidden"><div id="savepage"></div></main>
 <main id="view-config" class="view page hidden"><div id="config"></div></main>
 
+<!-- 直式手機：提示轉成橫向 -->
+<div class="rotate-hint" role="dialog" aria-label="建議橫向遊玩">
+  <div class="rh-box">
+    <div class="rh-phone" aria-hidden="true"></div>
+    <b>請將手機轉成橫向</b>
+    <p>戰鬥畫面為橫向設計，轉成橫向可以同時看到敵人、我方與技能。</p>
+    <div class="rh-btns">
+      <button class="primary fs-only-btn" data-cmd="fullscreen">全螢幕橫向</button>
+      <button data-cmd="portraitok">仍以直式繼續</button>
+    </div>
+  </div>
+</div>
+
 <div id="fx"><svg id="fxsvg"></svg></div>
 <div id="pop" class="pop hidden"></div>
 <div id="modal" class="modal hidden"><div id="modalBox" class="modal-box"></div></div>
@@ -102,7 +121,7 @@
   </defs>
 </svg>
 
-<script src="js/icons.js"></script>
+<script src="js/icons.js?v=20261022-landscape"></script>
 <script src="js/audio.js"></script>
 <script src="js/art-images.js?v=20261023-character-casts-2"></script>
 <script src="js/art.js?v=20261023-character-casts-2"></script>
@@ -118,7 +137,7 @@
 <script src="js/ultcine.js?v=20261022-raiden-phase2"></script>
 <script src="js/ultfilm.js?v=20261022-raiden-phase2"></script>
 <script src="js/cutin.js?v=20261023-character-casts-2"></script>
-<script src="js/ui.js?v=20261023-twobars"></script>
+<script src="js/ui.js?v=20261023-merge-landscape"></script>
 <script src="js/gacha-anim.js"></script>
 <script src="js/ui-meta.js"></script>
 <script src="js/ui-save.js"></script>
