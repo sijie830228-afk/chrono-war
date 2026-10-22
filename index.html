@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>時序之戰</title>
-<link rel="stylesheet" href="css/style.css?v=20261022-raiden-phase2">
+<link rel="stylesheet" href="css/style.css?v=20261023-twobars">
 </head>
 <body class="in-battle">
 <!-- 右上角圖示導覽（戰鬥時隱藏） -->
@@ -24,7 +24,7 @@
 <main id="view-battle" class="view">
   <aside id="timeline" class="timeline"></aside>
   <section class="field">
-    <div class="stage" aria-hidden="true"><canvas class="st-canvas"></canvas><div class="st-rain"></div><div class="st-motes"></div></div>
+    <div class="stage" aria-hidden="true"><canvas class="st-canvas"></canvas><div class="st-bloodsky"></div><div class="st-bloodglow"></div><div class="st-bloodmoon"><i class="um"></i><i class="red"></i></div><div class="st-rain"></div><div class="st-motes"></div></div>
     <div id="funeral" class="funeral-bg" aria-hidden="true"></div>
     <div id="splash" class="splash none" aria-hidden="true"></div>
     <!-- 戰鬥右上角：倍速／自動／暫停 -->
@@ -33,7 +33,7 @@
       <button class="bc" data-cmd="autotoggle" id="autoBtn" data-icon="auto" data-tip="自動戰鬥"></button>
       <button class="bc" data-cmd="pause" data-icon="pause" data-tip="暫停（Esc）"></button>
     </div>
-    <div class="rstack"><div id="loom" class="loombox hidden"></div><div id="cashbox" class="cbox hidden" data-uid="cashbox"></div><div id="flow" class="flbox hidden"></div></div>
+    <div class="rstack"><div id="loom" class="loombox hidden"></div><div id="cashbox" class="cbox hidden" data-uid="cashbox" aria-label="兌現匣"></div><div id="flow" class="flbox hidden"></div></div>
     <div id="market" class="mkbox hidden"></div>
     <div id="enemies" class="enemies-row"></div>
     <div id="midinfo" class="midinfo"></div>
@@ -70,7 +70,7 @@
         <label title="自動戰鬥每一步之間的間隔">自動間隔 <input type="number" data-ui="autoInterval" min="0" step="100"> ms</label>
         <label title="期望值：每一擊都是平均值，不會出現暴擊；隨機擲骰：依暴擊率判定，暴擊以金色大字與「暴擊」標籤顯示">暴擊計算 <select data-crit><option value="random">隨機擲骰</option><option value="expected">期望值</option></select></label>
         <label title="動畫播放速度">動畫速度 <select data-ui="speed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
-        <label title="施放終結技時播放的演出（點擊畫面可跳過）">終結技演出 <select data-ui="ultAnim"><option value="full">完整（約 10 秒）</option><option value="short">精簡（約 3 秒）</option><option value="off">關閉</option></select></label>
+        <label title="快速顯示角色施放效果；完整與精簡演出可點擊跳過">終結技演出 <select data-ui="ultAnim"><option value="full">完整（約 10 秒）</option><option value="short">精簡（約 3 秒）</option><option value="off">快速</option></select></label>
       </div>
       <div class="pm-snd sndctl"></div>
       <p class="pm-hint">點狀態標籤看效果 · 長按角色看即時數值 · 終結技隨時可按（1–4）· Q 普攻 · E 戰技 · L 戰鬥紀錄</p>
@@ -104,20 +104,21 @@
 
 <script src="js/icons.js"></script>
 <script src="js/audio.js"></script>
-<script src="js/art-images.js?v=20261022-raiden-phase2"></script>
-<script src="js/art.js?v=20261022-raiden-phase2"></script>
-<script src="js/stage.js"></script>
+<script src="js/art-images.js?v=20261023-character-casts-2"></script>
+<script src="js/art.js?v=20261023-character-casts-2"></script>
+<script src="js/stage.js?v=20261023-twobars"></script>
 <script src="js/relics.js"></script>
 <script src="js/quotes.js"></script>
-<script src="js/engine.js?v=20261019-combat-fx"></script>
+<script src="js/engine.js?v=20261023-twobars"></script>
 <script src="js/meta.js"></script>
 <script src="js/save.js"></script>
 <script src="js/chardata.js"></script>
-<script src="js/enemydata.js"></script>
-<script src="js/ultfx.js?v=20261022-raiden-phase2"></script>
+<script src="js/enemydata.js?v=20261023-twobars"></script>
+<script src="js/ultfx.js?v=20261023-twobars"></script>
 <script src="js/ultcine.js?v=20261022-raiden-phase2"></script>
 <script src="js/ultfilm.js?v=20261022-raiden-phase2"></script>
-<script src="js/ui.js?v=20261022-raiden-phase2"></script>
+<script src="js/cutin.js?v=20261023-character-casts-2"></script>
+<script src="js/ui.js?v=20261023-twobars"></script>
 <script src="js/gacha-anim.js"></script>
 <script src="js/ui-meta.js"></script>
 <script src="js/ui-save.js"></script>

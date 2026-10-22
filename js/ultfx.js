@@ -1226,6 +1226,16 @@ const UltFx = (() => {
     }
     c.restore();
   }
+  /** 花的小圖（介面特效與葬禮花圈共用，和終結技動畫同一款罌粟與白菊）：kind 0 = 罌粟、1 = 白菊 */
+  const flowerUrls = [];
+  function flowerSprite(kind) {
+    if (!flowerUrls[kind]) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 96;
+      flower(cv.getContext('2d'), 48, 48, 36, kind, kind ? 0.12 : 0.3, 1);
+      flowerUrls[kind] = cv.toDataURL();
+    }
+    return flowerUrls[kind];
+  }
   const MILLER = {
     setup(s) {
       const R = s.R, vw = s.vw, vh = s.vh;
@@ -1681,7 +1691,7 @@ const UltFx = (() => {
   const peak = sh => (sh && sh.length ? sh.reduce((a, b) => (b[2] > a[2] ? b : a))[0] : 0);   // 最強的一次震動 = 命中瞬間
   /** 命中瞬間（毫秒，未縮放）：場景可用 impact 指定，否則取最強的震動 */
   const impact = key => { const sc = SCENES[key]; return sc ? (sc.impact != null ? sc.impact : peak(sc.shake)) : 0; };
-  return { play, stop, skip, seek, impact, has: key => !!SCENES[key], get active() { return !!st; }, BASE,
+  return { play, stop, skip, seek, impact, flowerSprite, has: key => !!SCENES[key], get active() { return !!st; }, BASE,
     /** 共用繪圖工具（完整版演出 UltCine 也使用） */
     draw: { title, label, blade, glowDot, flash, vignette, roundRect, rng, SERIF, SANS, godlessMoon, godlessChain, godlessSigil } };
 })();

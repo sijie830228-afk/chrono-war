@@ -13,7 +13,7 @@ const Art = (() => {
   // bg：'white' 白底（預設）、'smooth' 平滑漸層的深色背景（以顏色連續性判斷背景）、
   //     'fade' 邊緣淡出、'whiteFade' 先去白邊再淡出、'alpha' 原圖已是透明背景（不處理）
   const FOCUS = {
-    kane:          { face: [0.47, 0.18], bust: [0.5, 0.38], bg: 'alpha' },        // 透明背景（換新圖）
+    kane:          { face: [0.50, 0.115], bust: [0.50, 0.28], bg: 'alpha' },      // 永滅故事集、證物與交錯紅線
     mocha:         { face: [372, 290], bust: [380, 380] },
     mocha_elder:   { face: [0.575, 0.2], bust: [0.55, 0.4], bg: 'alpha' },
     mocha_younger: { face: [0.49, 0.105], bust: [0.5, 0.27], bg: 'alpha' },       // 透明背景（換新圖）
@@ -188,21 +188,36 @@ const Art = (() => {
     }
     return fy;
   }
-  /** 兄、弟分開的素材 → 並排合成一張雙人圖（弟在後、兄在前），臉部焦點放在弟 */
+  /** 雙人立繪先對齊兩人的臉；小頭像另合成雙人近景，避免高倍率只截到一人。 */
   function composeMocha() {
     const A = data.mocha_elder, B = data.mocha_younger;
     if (data.mocha || !A || !B) return Promise.resolve();
     const h = Math.max(A.h, B.h), sa = h / A.h, sb = h / B.h;
     const wa = A.w * sa, wb = B.w * sb, off = wa * 0.46, W = Math.round(off + wb);
-    const c = document.createElement('canvas'); c.width = W; c.height = h;
+    const fy = Math.max(A.facePx[1] * sa, B.facePx[1] * sb);
+    const ay = fy - A.facePx[1] * sa, by = fy - B.facePx[1] * sb, H = Math.ceil(h + Math.max(ay, by));
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d');
-    g.drawImage(B.canvas, off, 0, wb, h);
-    g.drawImage(A.canvas, 0, 0, wa, h);
-    const facePx = [off + B.facePx[0] * sb, B.facePx[1] * sb];
-    const bust = [(A.bust[0] * wa + off + B.bust[0] * wb) / 2 / W, (A.bust[1] + B.bust[1]) / 2];
-    const info = { w: W, h, face: [facePx[0] / W, facePx[1] / h], bust, facePx, url: null, canvas: c, duo: true };
-    info.top = figureTop(c, info.face[0], info.face[1]);
-    return new Promise(res => c.toBlob(b => { info.url = b ? URL.createObjectURL(b) : c.toDataURL('image/png'); data.mocha = info; res(); }, 'image/png'));
+    g.drawImage(B.canvas, off, by, wb, h);
+    g.drawImage(A.canvas, 0, ay, wa, h);
+    const facePx = [(A.facePx[0] * sa + off + B.facePx[0] * sb) / 2, fy];
+    const bust = [(A.bust[0] * wa + off + B.bust[0] * wb) / 2 / W,
+      (ay + A.bust[1] * h + by + B.bust[1] * h) / 2 / H];
+    const info = { w: W, h: H, face: [facePx[0] / W, fy / H], bust, facePx, url: null, canvas: c, duo: true };
+    info.top = Math.min(ay + (A.top || 0) * h, by + (B.top || 0) * h) / H;
+    const portrait = document.createElement('canvas'); portrait.width = portrait.height = 512;
+    const pg = portrait.getContext('2d');
+    [A, B].forEach((a, i) => {
+      const sc = 152 / Math.max(40, (a.bust[1] - a.face[1]) * a.h);
+      pg.save(); pg.beginPath(); pg.rect(i * 256, 0, 256, 512); pg.clip();
+      pg.drawImage(a.canvas, i * 256 + 128 - a.facePx[0] * sc, 200 - a.facePx[1] * sc, a.w * sc, a.h * sc);
+      pg.restore();
+    });
+    info.faceCanvas = portrait;
+    const url = (cv, prop) => new Promise(res => cv.toBlob(b => {
+      info[prop] = b ? URL.createObjectURL(b) : cv.toDataURL('image/png'); res();
+    }, 'image/png'));
+    return Promise.all([url(c, 'url'), url(portrait, 'faceUrl')]).then(() => { data.mocha = info; });
   }
   /**
    * 深色漸層背景的去背：從上、左、右三邊與底邊兩側往內擴張，
@@ -296,6 +311,7 @@ const Art = (() => {
       const a = data[k];
       if (!a) return '';
       const f = a[focus || 'bust'];
+      if (focus === 'face' && a.duo && a.faceUrl) return `background-image:url(${a.faceUrl});background-size:100% 100%;background-position:center`;
       // Face portraits are square (the action-strip portrait is nearly square).
       // CSS percentages position the free space around the scaled image, not
       // the point inside it; convert the anchor so full-body art stays centered.
