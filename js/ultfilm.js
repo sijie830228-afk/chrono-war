@@ -1480,11 +1480,11 @@ const UltFilm = (() => {
   };
 
   /* =========================================================
-   * 亞歷山卓「速度與執勤」（11.5 秒，夜間紅藍）
-   *   第一幕 夜間追緝：無線電通報，警車在高架道路上疾馳
-   *   第二幕 車內特寫：紅藍警燈掃過她的臉 ——「Buckle up.」
-   *   第三幕 甩尾攔截：嫌犯在前方逃竄，警車甩尾橫停，她下車
-   *   第四幕 執勤：風刃橫掃、押送的手銬扣上 → 警燈下定格
+   * 亞歷山卓「速度與執勤」（12 秒，夜間紅藍 → 白天）
+   *   第一幕 追車鏡頭：跟在警車後方，後擋風玻璃裡看得見她的人影與儀表板的光；說完「收到」後推向駕駛座
+   *   第二幕 駕駛座：儀表盤不斷提速 → 換檔 → 後照鏡裡的眼神 → 速度感加強
+   *   第三幕 越過引擎蓋：鏡頭推向前方逃竄的嫌犯 → 車燈爆白、紅藍面板合攏的轉場（命中）
+   *   第四幕 警局門口：嫌犯已被押上台階、凱恩在門口接手（呼應「結案」），倚著警車的她與飄落的罰單
    * ========================================================= */
   function prepNightCity(s) {
     if (s.nightCity) return;
@@ -1526,137 +1526,295 @@ const UltFilm = (() => {
       glow(c, x - i * 26 - dt * 160, y - dt * 60 - hash(i) * 30, 50 + dt * 220, 'rgba(170,180,200,.55)', a * Math.max(0, 1 - dt * 0.9));
     }
   }
+  /* ---------- 亞歷山卓：追車鏡頭用的道具 ---------- */
+  const HZ = 470, VPX = 800;   // 追車鏡頭的地平線與消失點
+  /** 透視道路：車道線朝鏡頭移動、兩側路燈掠過；off = 已經跑過的距離 */
+  function chaseRoad(c, t, off, o) {
+    o = o || {};
+    c.fillStyle = lin(c, 0, HZ, 0, H, [[0, '#0c0e1c'], [1, '#05060c']]); c.fillRect(-W, HZ, W * 3, H);
+    c.fillStyle = lin(c, 0, HZ, 0, H, [[0, '#191c30'], [1, '#0c0d17']]);
+    poly(c, [[VPX - 26, HZ], [VPX + 26, HZ], [VPX + 1500, H + 40], [VPX - 1500, H + 40]]); c.fill();
+    c.strokeStyle = 'rgba(210,220,255,.25)'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(VPX - 26, HZ); c.lineTo(VPX - 1500, H + 40); c.moveTo(VPX + 26, HZ); c.lineTo(VPX + 1500, H + 40); c.stroke();
+    const span = 14, f = 430, lane = (z, dx) => VPX + dx * f / z;
+    for (let i = 0; i < span; i++) {   // 中央車道線：每段固定的深度，往鏡頭推近
+      const z = ((i - off * 0.004) % span + span) % span + 0.55, z2 = z + 0.32;
+      const y1 = HZ + f / z, y2 = HZ + f / z2;
+      c.fillStyle = `rgba(255,232,160,${Math.min(0.9, 0.9 / z * 2).toFixed(3)})`;
+      poly(c, [[lane(z, -0.05), y1], [lane(z, 0.05), y1], [lane(z2, 0.05), y2], [lane(z2, -0.05), y2]]); c.fill();
+    }
+    for (let i = 0; i < 9; i++) {      // 路燈：左右交錯
+      const z = ((i * 1.6 - off * 0.0032) % 14.4 + 14.4) % 14.4 + 0.7, side = i % 2 ? 1 : -1;
+      const x = lane(z, side * 3.4), yb = HZ + f / z, h = 900 / z;
+      c.fillStyle = '#05060d'; c.fillRect(x - 3 / z * 4, yb - h, Math.max(1.5, 14 / z), h);
+      glow(c, x - side * 40 / z, yb - h, 220 / z, 'rgba(255,214,150,.6)', o.lamp == null ? 1 : o.lamp);
+    }
+  }
+  /** 從後方看的警車（腳底中央為錨點）：後擋風玻璃裡看得見駕駛的人影與儀表板的光 */
+  function carRear(c, t, x, y, k, o) {
+    o = o || {};
+    c.save(); c.translate(x, y); c.scale(k, k);
+    c.fillStyle = 'rgba(0,0,0,.55)'; c.beginPath(); c.ellipse(0, 0, 320, 26, 0, 0, TAU); c.fill();
+    rect(c, -262, -66, 74, 66, '#07080c'); rect(c, 188, -66, 74, 66, '#07080c');
+    c.fillStyle = '#20232c'; poly(c, [[-286, -46], [286, -46], [272, -12], [-272, -12]]); c.fill();
+    c.fillStyle = lin(c, 0, -210, 0, -40, [[0, '#f4f7fb'], [0.6, '#d3dbe7'], [1, '#97a3b6']]);
+    poly(c, [[-296, -206], [296, -206], [288, -44], [-288, -44]]); c.fill();
+    c.fillStyle = '#1f4fbf'; c.fillRect(-292, -132, 584, 26); c.fillStyle = '#0f2a70'; c.fillRect(-292, -108, 584, 5);
+    c.fillStyle = '#ffffff'; c.font = '900 22px "Arial Black", Arial, sans-serif'; c.textAlign = 'center'; c.fillText('POLICE', 0, -112);
+    [[-1], [1]].forEach(([sd]) => { c.fillStyle = '#c41020'; c.fillRect(sd < 0 ? -286 : 204, -196, 82, 34); glow(c, sd * 245, -180, 90, 'rgba(255,40,40,.55)', 0.8); });
+    rect(c, -62, -88, 124, 34, '#eef1f6'); c.fillStyle = '#1a2a50'; c.font = '700 20px "Courier New", monospace'; c.fillText('BPD·07', 0, -64);
+    // 車廂與後擋風玻璃
+    c.fillStyle = '#2a2e3a'; poly(c, [[-236, -206], [236, -206], [184, -338], [-184, -338]]); c.fill();
+    poly(c, [[-210, -214], [210, -214], [166, -326], [-166, -326]]);
+    c.fillStyle = lin(c, 0, -326, 0, -214, [[0, '#0c1424'], [1, '#18243c']]); c.fill();
+    c.save(); poly(c, [[-210, -214], [210, -214], [166, -326], [-166, -326]]); c.clip();
+    glow(c, 0, -330, 260, 'rgba(255,245,220,.35)', 1);                    // 前方的車燈與路面
+    glow(c, -70, -214, 150, 'rgba(95,227,168,.55)', 0.9 + 0.1 * Math.sin(t * 0.02));   // 儀表板的綠光
+    c.fillStyle = '#04060b';                                                    // 駕駛的人影：警帽、頭、肩
+    c.beginPath(); c.ellipse(-78, -222, 64, 30, 0, Math.PI, 0); c.fill();
+    c.beginPath(); c.arc(-78, -268, 25, 0, TAU); c.fill();
+    poly(c, [[-108, -286], [-48, -286], [-52, -300], [-104, -300]]); c.fill();
+    c.fillStyle = '#0a0e18'; c.beginPath(); c.ellipse(78, -246, 34, 40, 0, 0, TAU); c.fill();   // 副駕駛座的頭枕
+    c.fillStyle = 'rgba(255,255,255,.09)'; poly(c, [[-120, -326], [-60, -326], [-140, -214], [-200, -214]]); c.fill();
+    c.restore();
+    // 車頂警燈：紅藍交替
+    rect(c, -186, -350, 372, 14, '#15171e');
+    const on = Math.floor(t / 140) % 2;
+    [[-1, '255,40,60'], [1, '40,120,255']].forEach(([sd, col], i) => {
+      const lit = i === on;
+      c.fillStyle = lit ? `rgb(${col})` : `rgba(${col},.4)`; c.fillRect(sd < 0 ? -150 : 4, -376, 146, 26);
+      if (lit) glow(c, sd * 80, -362, 260, `rgba(${col},.55)`, 1);
+    });
+    c.restore();
+  }
+  /** 圓形儀表：v = 指針數值、max = 滿刻度；red = 紅區的起點 */
+  function gauge(c, cx, cy, r, v, max, red, label, unit) {
+    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = x => a0 + (a1 - a0) * clamp(x / max);
+    c.save();
+    c.fillStyle = lin(c, 0, cy - r, 0, cy + r, [[0, '#0b1214'], [1, '#020405']]);
+    c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.fill();
+    c.strokeStyle = '#1c2a2a'; c.lineWidth = 6; c.stroke();
+    c.lineWidth = r * 0.06; c.strokeStyle = 'rgba(255,60,60,.85)'; c.beginPath(); c.arc(cx, cy, r * 0.86, ang(red), a1); c.stroke();
+    for (let i = 0; i <= 12; i++) {
+      const a = a0 + (a1 - a0) * i / 12, big = i % 2 === 0;
+      c.strokeStyle = i / 12 * max >= red ? '#ff6a6a' : '#bff7df'; c.lineWidth = big ? 4 : 2;
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * r * (big ? 0.7 : 0.76), cy + Math.sin(a) * r * (big ? 0.7 : 0.76)); c.lineTo(cx + Math.cos(a) * r * 0.82, cy + Math.sin(a) * r * 0.82); c.stroke();
+    }
+    const a = ang(v);
+    c.shadowColor = '#5fe3a8'; c.shadowBlur = 16; c.strokeStyle = '#ff5a4a'; c.lineWidth = r * 0.035;
+    c.beginPath(); c.moveTo(cx - Math.cos(a) * r * 0.12, cy - Math.sin(a) * r * 0.12); c.lineTo(cx + Math.cos(a) * r * 0.78, cy + Math.sin(a) * r * 0.78); c.stroke();
+    c.shadowBlur = 0; c.fillStyle = '#1a2224'; c.beginPath(); c.arc(cx, cy, r * 0.1, 0, TAU); c.fill();
+    c.fillStyle = '#7ff0bf'; c.textAlign = 'center'; c.font = `700 ${Math.round(r * 0.26)}px "Courier New", monospace`; c.fillText(String(Math.round(v)), cx, cy + r * 0.48);
+    c.fillStyle = 'rgba(191,247,223,.7)'; c.font = `600 ${Math.round(r * 0.1)}px "Courier New", monospace`; c.fillText(unit, cx, cy + r * 0.64);
+    if (label) c.fillText(label, cx, cy - r * 0.32);
+    c.restore();
+  }
+  /** 警局門口（白天，和凱恩「結案」的封鎖現場同一套日光色調） */
+  function prepStation(s) {
+    if (s.station) return;
+    const bg = canvas(LW, LH), g = bg.getContext('2d'), dx = 100, dy = 50;   // 背景圖層比畫面大，換算成圖層座標
+    g.fillStyle = lin(g, 0, 0, 0, 520, [[0, '#2a7de0'], [0.6, '#6fb3f2'], [1, '#c9e6ff']]); g.fillRect(0, 0, LW, 560);
+    for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(255,255,255,.5)'; for (let k = 0; k < 5; k++) { g.beginPath(); g.ellipse(1250 + i * 160 + k * 40, 90 + i * 34 + Math.sin(k) * 10, 70, 20, 0, 0, TAU); g.fill(); } }
+    for (let i = 0; i < 6; i++) { const x = i < 3 ? i * 90 : 1460 + (i - 3) * 110, h = 260 + hash(i + 70) * 160; g.fillStyle = '#9db6d6'; g.fillRect(x, 560 - h, 96, h); }
+    const L = 300 + dx, R = 1500 + dx, top = 110 + dy, base = 600 + dy, door = 620 + dx;
+    g.fillStyle = lin(g, 0, 560, 0, base + 130, [[0, '#aebccd'], [1, '#c9d3df']]); g.fillRect(0, 560, LW, base + 130 - 560);   // 大樓兩側的廣場地面
+    g.fillStyle = lin(g, L, 0, R, 0, [[0, '#cfc6b4'], [0.5, '#e2dacb'], [1, '#b9af9c']]); g.fillRect(L, top, R - L, base - top);
+    g.fillStyle = '#a69b86'; g.fillRect(L - 20, top - 22, R - L + 40, 30); g.fillRect(L - 10, base - 18, R - L + 20, 18);
+    for (let row = 0; row < 2; row++) for (let i = 0; i < 9; i++) {   // 窗戶
+      const wx = L + 50 + i * 128; if (Math.abs(wx + 32 - door) < 230) continue;
+      const wy = top + 40 + row * 140; g.fillStyle = '#5a6b86'; g.fillRect(wx - 4, wy - 4, 72, 102);
+      g.fillStyle = lin(g, 0, wy, 0, wy + 94, [[0, '#9fc6ee'], [1, '#2a4a78']]); g.fillRect(wx, wy, 64, 94);
+      g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(wx + 6, wy + 4, 10, 86);
+    }
+    // 招牌與大門
+    g.fillStyle = '#13244a'; g.fillRect(door - 230, top + 8, 460, 86);
+    g.strokeStyle = '#e8c56a'; g.lineWidth = 3; g.strokeRect(door - 222, top + 16, 444, 70);
+    g.fillStyle = '#f4f0e2'; g.textAlign = 'center'; g.font = '900 30px "Arial Black", Arial, sans-serif'; g.fillText('BROOKLYN  POLICE', door, top + 50);
+    g.fillStyle = '#e8c56a'; g.font = '700 20px "Microsoft JhengHei", "PingFang TC", sans-serif'; g.fillText('7TH PRECINCT ・ 第七分局', door, top + 78);
+    [[-1], [1]].forEach(([sd]) => { g.fillStyle = '#ece6d8'; g.fillRect(door + sd * 200 - 26, top + 110, 52, base - top - 110); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(door + sd * 200 + 14, top + 110, 12, base - top - 110); });
+    g.fillStyle = '#3a2a1e'; g.fillRect(door - 150, top + 150, 300, base - top - 150);
+    g.fillStyle = lin(g, 0, top + 160, 0, base, [[0, '#ffe6b0'], [1, '#c89858']]); g.fillRect(door - 136, top + 162, 272, base - top - 162);   // 敞開的門內
+    // 門口兩側的綠色球燈
+    [[-1], [1]].forEach(([sd]) => { const lx = door + sd * 270; g.fillStyle = '#20262e'; g.fillRect(lx - 4, top + 210, 8, base - top - 210); glow(g, lx, top + 200, 80, 'rgba(80,255,150,.45)', 1); g.fillStyle = '#5fe39a'; g.beginPath(); g.arc(lx, top + 200, 22, 0, TAU); g.fill(); });
+    // 台階、人行道與街道
+    for (let i = 0; i < 5; i++) { const y = base + i * 26, w = 360 + i * 48; g.fillStyle = i % 2 ? '#d6cfbf' : '#e4ddcd'; g.fillRect(door - w, y, w * 2, 26); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(door - w, y + 22, w * 2, 4); }
+    g.fillStyle = '#c4d2e2'; g.fillRect(0, base + 130, LW, 40);
+    g.fillStyle = lin(g, 0, base + 170, 0, LH, [[0, '#8595ad'], [1, '#56647c']]); g.fillRect(0, base + 170, LW, LH - base - 170);
+    s.station = bg;
+    s.stationDoor = { x: 620, top: 110 + 162, base: 600 };   // 畫面座標：門洞
+  }
   const ALEXANDRA = {
-    dur: 11500,
+    dur: 12200,
     voice: { pitch: 1.15, rate: 1.0 },
-    vo: [[300, 'All units — suspect heading east on Ninth.', '全體單位注意——嫌犯正沿第九街往東逃逸。', 2000, { pitch: 0.75, rate: 1.15 }], [2100, 'Copy. Unit seven, on it.', '收到。七號車，我來處理。', 2900],
-      [3300, 'Buckle up.', '繫好安全帶。', 4100], [4900, 'Pull over!', '靠邊停車！', 5800], [7700, 'License and registration—', '駕照、行照——', 8700], [8900, '—revoked.', '——一律吊銷。', 9700]],
+    vo: [[300, 'All units — suspect heading east on Ninth.', '全體單位注意——嫌犯正沿第九街往東逃逸。', 2000, { pitch: 0.75, rate: 1.15 }], [2100, 'Copy. Unit seven, on it.', '收到。七號車，我來處理。', 2850],
+      [3300, 'Buckle up.', '繫好安全帶。', 4000], [4850, 'You\'re not getting away.', '你跑不掉的。', 5700], [6400, 'Pull over!', '靠邊停車！', 7200],
+      [9000, 'License and registration—', '駕照、行照——', 9900], [10100, '—revoked.', '——一律吊銷。', 10900]],
     setup(s) {
       s.H = prepHero('alexandra', { shadow: '#060a18', light: '#e6f6ff', rim: '#5fe3a8', lampRGB: '255,230,200', shade: '6,12,34' });
       if (s.H) { const src = s.H.a.canvas; s.H.red = tint(src, '#ff3a4a', 0.38); s.H.blue = tint(src, '#3a7aff', 0.38); }
-      s.H2 = prepHero('alexandra_car', { shadow: '#060a18', light: '#e6f6ff', rim: '#5fe3a8', lampRGB: '255,230,200', shade: '6,12,34' });   // 定格：倚著警車
+      s.H2 = prepHero('alexandra_car', { shadow: '#060a18', light: '#e6f6ff', rim: '#5fe3a8', lampRGB: '255,230,200', shade: '6,12,34', dayShade: '24,58,120' });   // 定格：倚著警車
+      s.K = prepKane(s);   // 警局門口等著接手的凱恩（呼應「結案」）
       prepEnemies(s);
       if (!s.car) prepDay(s);
-      prepNightCity(s);
+      prepNightCity(s); prepStation(s);
       s.cites = Array.from({ length: 16 }, (_, i) => ({ x: hash(i + 3) * W, y: -100 - hash(i + 5) * 500, vy: 0.18 + hash(i + 7) * 0.2, vx: (hash(i + 9) - 0.5) * 0.1, r: hash(i) * TAU, vr: (hash(i + 2) - 0.5) * 0.006 }));
     },
     score() {
       return {
-        cues: [[0, 'siren', { dur: 3.2, vol: 0.03 }], [0, 'engine', { dur: 2.6, vol: 0.14, up: true }], [250, 'radio', { n: 3 }], [2600, 'whoosh', { dur: 0.4 }], [3200, 'click'],
-          [4200, 'engine', { dur: 2.0, vol: 0.18, up: true }], [4300, 'siren', { dur: 2.2, vol: 0.04 }], [4800, 'footsteps', { n: 6, gap: 0.18 }], [6100, 'screech', { dur: 1.0 }], [6900, 'door'],
-          [7300, 'riser', { dur: 1.2, vol: 0.18 }], [8550, 'whoosh', { dur: 0.35, vol: 0.4 }], [8650, 'impact', { vol: 1 }], [8700, 'boom', { vol: 0.6 }], [9000, 'cuffs'], [9200, 'paper', { n: 10 }],
-          [9400, 'siren', { dur: 2.0, vol: 0.025 }], [9500, 'sting', { notes: [43, 50, 55, 59, 62], dur: 2.2 }]],
-        bed: [[0, [31, 43, 50]], [2600, [31, 43, 50, 55]], [4200, [33, 45, 52]], [6100, [31, 43, 50]], [8650, [31, 43, 50, 55, 59]]],
+        cues: [[0, 'siren', { dur: 3.0, vol: 0.03 }], [0, 'engine', { dur: 2.8, vol: 0.14, up: true }], [250, 'radio', { n: 3 }], [2100, 'radio', { n: 2 }], [2850, 'whoosh', { dur: 0.4 }],
+          [3600, 'click'], [3900, 'engine', { dur: 1.8, vol: 0.18, up: true }], [4200, 'impact', { vol: 0.35 }], [4220, 'click'], [4700, 'whooshDown', { dur: 0.4 }],
+          [5600, 'riser', { dur: 0.8, vol: 0.2 }], [5650, 'engine', { dur: 2.4, vol: 0.22, up: true }], [6300, 'whoosh', { dur: 0.5, vol: 0.4 }], [6350, 'siren', { dur: 2.0, vol: 0.05 }],
+          [7400, 'riser', { dur: 0.9, vol: 0.22 }], [8250, 'screech', { dur: 0.5 }], [8300, 'impact', { vol: 1 }], [8310, 'boom', { vol: 0.6 }],
+          [8700, 'door'], [8800, 'footsteps', { n: 5, gap: 0.3 }], [9500, 'cuffs'], [10300, 'paper', { n: 10 }], [10400, 'sting', { notes: [43, 50, 55, 59, 62], dur: 2.2 }]],
+        bed: [[0, [31, 43, 50]], [2850, [31, 43, 50, 55]], [4700, [33, 45, 52]], [6300, [31, 43, 50, 57]], [8300, [36, 48, 55, 59]], [10400, [31, 43, 50, 55, 59]]],
       };
     },
-    shake: [[6100, 700, 6], [8650, 500, 26], [9000, 200, 6]],
+    shake: [[4200, 220, 5], [6300, 400, 6], [8300, 600, 26], [9500, 200, 5]],
     draw(c, t, s) {
-      const H0 = s.H;
-      if (t < 2600) {   // 夜間高架：警車疾馳（側面）
-        const k = { x: lerp(-30, 30, t / 2600), y: 0, z: 1.04, r: 0 }, off = t * 1.6;
-        c.save(); cam(c, k, 0.2); layer(c, s.nightCity); c.restore();
-        c.save(); cam(c, k, 1); nightRoad(c, t, off);
-        const cx = 700 + Math.sin(t * 0.002) * 30;
-        c.save(); c.globalAlpha = 0.55; c.fillStyle = lin(c, cx + 270, 0, cx + 1000, 0, [[0, 'rgba(255,250,220,.7)'], [1, 'rgba(255,250,220,0)']]); poly(c, [[cx + 270, 735], [cx + 1000, 660], [cx + 1000, 860], [cx + 270, 760]]); c.fill(); c.restore();
-        policeCar(c, t, cx, 830, 1.05, false, 0, Math.sin(t * 0.04) * 2);
+      const H0 = s.H, r = 0.5 + 0.5 * Math.sin(t * 0.03);
+      if (t < 2900) {   // 鏡頭跟在警車後方：後擋風玻璃裡的人影與儀表板的光；說完「收到」後往駕駛座推近
+        const push = eio(prog(t, 2500, 2900)), off = t * 1.8;
+        const k = { x: Math.sin(t * 0.0013) * 20 * (1 - push) - 88 * push, y: 110 * push, z: 1 + push * 2.6, r: Math.sin(t * 0.001) * 0.01 };   // 推向駕駛的人影
+        c.save(); cam(c, k, 0.15); c.translate(0, -170); layer(c, s.nightCity); c.restore();
+        c.save(); cam(c, k, 1); chaseRoad(c, t, off);
+        carRear(c, t, VPX + Math.sin(t * 0.0021) * 16, 860, 1.12, {});
         c.restore();
-        c.strokeStyle = 'rgba(200,220,255,.35)'; c.lineWidth = 2;   // 速度線
-        for (let i = 0; i < 30; i++) { const y = 80 + hash(i) * 760, x = W - ((t * (2 + hash(i + 1) * 2) + hash(i + 2) * 2000) % (W + 400)); c.beginPath(); c.moveTo(x, y); c.lineTo(x + 180, y); c.stroke(); }
+        sirenWash(c, t, 0.35);
         if (t > 250 && t < 2000) { c.save(); c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(60, 60, 360, 70); c.fillStyle = '#7ff0bf'; c.font = '700 24px "Courier New", monospace'; c.fillText('◉ DISPATCH  CH-7', 80, 104); c.restore(); }
+        full(c, '#04060e', push * 0.9);
         vignette(c, 0.6, 'rgba(2,4,14,1)');
         return;
       }
-      if (t < 4200) {   // 車內特寫：紅藍警燈掃過臉
-        full(c, '#04060e', 1);
-        const k = { x: 0, y: 0, z: 1 + prog(t, 2600, 4200) * 0.05, r: 0 };
-        c.save(); cam(c, k, 1);
-        heroDraw(c, H0, 'dark', 820, 360, 1900, { band: [lerp(200, 1400, prog(t, 3000, 3900)), 260] });   // 路燈的光帶掃過
-        const r = 0.5 + 0.5 * Math.sin(t * 0.03);
-        heroDraw(c, H0, 'red', 820, 360, 1900, { alpha: r * 0.7 });
-        heroDraw(c, H0, 'blue', 820, 360, 1900, { alpha: (1 - r) * 0.7 });
+      if (t < 6300) {   // 駕駛座：儀表盤不斷提速 → 換檔 → 後照鏡中的眼神 → 速度感加強
+        const kmh = t < 5600 ? lerp(96, 168, prog(t, 2900, 5600)) : lerp(168, 236, eio(prog(t, 5600, 6200)));
+        if (t < 3900 || t >= 5600) {   // 儀表盤
+          const p = t < 3900 ? prog(t, 2900, 3900) : prog(t, 5600, 6300), hot = t >= 5600;
+          full(c, '#03050a', 1);
+          c.save(); cam(c, { x: hot ? -140 * p : -40 + p * 30, y: hot ? 40 * p : 0, z: hot ? 1.25 + p * 0.9 : 1.08 + p * 0.06, r: hot ? -0.02 * p : 0 }, 1);
+          c.save(); c.beginPath(); c.rect(0, 0, W, 430); c.clip(); chaseRoad(c, t, t * (hot ? 3.4 : 2.2), { lamp: 0.7 }); c.restore();   // 擋風玻璃外
+          c.fillStyle = lin(c, 0, 380, 0, H, [[0, '#0b0e16'], [1, '#020306']]); poly(c, [[-200, 470], [W + 200, 470], [W + 200, H + 100], [-200, H + 100]]); c.fill();
+          c.fillStyle = '#05070b'; c.beginPath(); c.ellipse(820, 470, 520, 70, 0, Math.PI, 0); c.fill();   // 儀表罩
+          gauge(c, 640, 640, 200, kmh, 260, 200, 'SPEED', 'km/h');
+          gauge(c, 1060, 660, 150, t < 4200 ? lerp(3.2, 6.4, prog(t, 2900, 3900)) : lerp(5.2, 7.6, prog(t, 5600, 6200)), 8, 6.5, 'RPM', '×1000');
+          c.fillStyle = '#7ff0bf'; c.font = '700 40px "Courier New", monospace'; c.textAlign = 'center'; c.fillText(t < 4200 ? '4' : '5', 850, 560);
+          c.restore();
+          if (hot) {   // 速度感：放射狀的流光從畫面中央往外
+            c.save(); c.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 70; i++) { const a = hash(i) * TAU, d0 = ((t * (1.4 + hash(i + 2)) + hash(i + 4) * 900) % 900), len = 40 + p * 260; c.strokeStyle = `rgba(190,255,230,${(0.15 + p * 0.5) * hash(i + 6)})`; c.lineWidth = 1 + hash(i + 8) * 3; c.beginPath(); c.moveTo(VPX + Math.cos(a) * d0, 450 + Math.sin(a) * d0 * 0.6); c.lineTo(VPX + Math.cos(a) * (d0 + len), 450 + Math.sin(a) * (d0 + len) * 0.6); c.stroke(); }
+            c.restore();
+            full(c, '#e9fff6', prog(t, 6150, 6300) * 0.9);
+          }
+          sirenWash(c, t, 0.3);
+          full(c, '#000', 1 - prog(t, 2900, 3050));
+          vignette(c, 0.7, 'rgba(2,4,14,1)');
+          return;
+        }
+        if (t < 4700) {   // 換檔：手套握住排檔桿，從 4 檔推進 5 檔
+          const p = eio(prog(t, 4080, 4220));
+          full(c, '#04060b', 1);
+          c.save(); cam(c, { x: 0, y: 0, z: 1.05 + prog(t, 3900, 4700) * 0.05, r: 0.02 }, 1);
+          c.fillStyle = lin(c, 0, 300, 0, H, [[0, '#121624'], [1, '#05060b']]); c.fillRect(-100, 260, W + 200, H);
+          c.save(); c.translate(800, 560); c.strokeStyle = 'rgba(191,247,223,.45)'; c.lineWidth = 8; c.lineCap = 'round';
+          c.beginPath(); [-170, 0, 170].forEach(x => { c.moveTo(x, -130); c.lineTo(x, 130); }); c.moveTo(-170, 0); c.lineTo(170, 0); c.stroke();
+          c.fillStyle = '#7ff0bf'; c.font = '700 34px "Courier New", monospace'; c.textAlign = 'center';
+          [['1', -170, -130], ['2', -170, 130], ['3', 0, -130], ['4', 0, 130], ['5', 170, -130], ['R', 170, 130]].forEach(([g, x, y]) => { c.globalAlpha = g === (p > 0.5 ? '5' : '4') ? 1 : 0.35; c.fillText(g, x + 40, y + 12); });
+          c.globalAlpha = 1; c.restore();
+          const kx = 800 + lerp(0, 170, p), ky = 560 + lerp(130, -130, p) - Math.sin(p * Math.PI) * 30;
+          c.fillStyle = '#07080d'; c.beginPath(); c.ellipse(800, 900, 150, 50, 0, 0, TAU); c.fill();   // 排檔桿的防塵套
+          c.strokeStyle = '#0d0f16'; c.lineWidth = 34; c.lineCap = 'round'; c.beginPath(); c.moveTo(800, 900); c.lineTo(kx, ky); c.stroke();
+          c.fillStyle = lin(c, kx - 70, ky - 70, kx + 70, ky + 70, [[0, '#4a5262'], [1, '#0e1118']]); c.beginPath(); c.arc(kx, ky, 66, 0, TAU); c.fill();
+          c.fillStyle = '#7ff0bf'; c.font = '700 40px "Courier New", monospace'; c.textAlign = 'center'; c.fillText(p > 0.5 ? '5' : '4', kx - 20, ky + 4);
+          c.fillStyle = '#141a22'; poly(c, [[kx + 40, ky - 70], [W + 200, ky - 220], [W + 200, ky + 160], [kx + 40, ky + 60]]); c.fill();   // 制服袖口
+          c.fillStyle = '#1c2230'; c.beginPath(); c.ellipse(kx + 20, ky - 10, 80, 62, -0.3, 0, TAU); c.fill();                      // 手套
+          c.strokeStyle = 'rgba(95,227,168,.8)'; c.lineWidth = 3; c.beginPath(); c.moveTo(kx + 120, ky - 104); c.lineTo(W + 200, ky - 254); c.stroke();
+          c.restore();
+          c.strokeStyle = 'rgba(190,255,230,.5)'; c.lineWidth = 2;
+          for (let i = 0; i < 20; i++) { const y = hash(i) * H, x = ((t * 3 + hash(i + 3) * 2000) % (W + 300)) - 300; c.globalAlpha = bump(t, 4220, 260); c.beginPath(); c.moveTo(x, y); c.lineTo(x + 260, y); c.stroke(); }
+          c.globalAlpha = 1;
+          sirenWash(c, t, 0.3); vignette(c, 0.7, 'rgba(2,4,14,1)');
+          return;
+        }
+        // 後照鏡：鏡中反射的眼神，紅藍警燈與路燈的光帶輪流掃過
+        full(c, '#03050a', 1);
+        c.save(); c.beginPath(); c.rect(0, 0, W, H); c.clip(); chaseRoad(c, t, t * 2.4, { lamp: 0.5 }); c.restore();
+        full(c, '#03050a', 0.55);
+        const mz = 1 + prog(t, 4700, 5600) * 0.08, mx = 800, my = 380, mw = 820 * mz, mh = 260 * mz;
+        c.save(); c.fillStyle = '#0a0b10'; D().roundRect(c, mx - mw / 2 - 22, my - mh / 2 - 22, mw + 44, mh + 44, 70); c.fill();
+        rect(c, mx - 14, my - mh / 2 - 260, 28, 240, '#0a0b10');
+        D().roundRect(c, mx - mw / 2, my - mh / 2, mw, mh, 54); c.clip();
+        c.fillStyle = '#0b0f1a'; c.fillRect(mx - mw / 2, my - mh / 2, mw, mh);
+        if (H0) {
+          c.translate(mx * 2, 0); c.scale(-1, 1);   // 鏡像
+          heroDraw(c, H0, 'dark', mx, my + 95 * mz, 3300 * mz, { band: [lerp(-400, 2000, prog(t, 4900, 5500)), 300] });
+          heroDraw(c, H0, 'red', mx, my + 95 * mz, 3300 * mz, { alpha: r * 0.55 });
+          heroDraw(c, H0, 'blue', mx, my + 95 * mz, 3300 * mz, { alpha: (1 - r) * 0.55 });
+        }
         c.restore();
-        c.fillStyle = lin(c, 0, 760, 0, 900, [[0, 'rgba(10,14,26,0)'], [0.4, '#0a0e1a'], [1, '#05070c']]); c.fillRect(0, 760, W, 140);   // 儀表板
-        c.fillStyle = 'rgba(95,227,168,.8)'; c.font = '700 28px "Courier New", monospace'; c.fillText(`${Math.round(lerp(88, 164, prog(t, 2600, 4200)))} km/h`, 120, 850);
-        sirenWash(c, t, 0.6);
-        full(c, '#ffffff', 0.4 * bump(t, 2620, 120));
-        vignette(c, 0.7, 'rgba(2,4,14,1)');
+        c.save(); c.globalAlpha = 0.18; c.fillStyle = '#ffffff'; poly(c, [[mx - mw * 0.3, my - mh / 2], [mx - mw * 0.18, my - mh / 2], [mx - mw * 0.36, my + mh / 2], [mx - mw * 0.48, my + mh / 2]]); c.fill(); c.restore();
+        sirenWash(c, t, 0.35); vignette(c, 0.75, 'rgba(2,4,14,1)');
         return;
       }
-      if (t < 7600) {   // 追逐 → 甩尾橫停 → 下車
-        const drift = eo(prog(t, 6100, 6900)), stop = prog(t, 6100, 6900);
-        const k = { x: lerp(0, 120, prog(t, 4200, 6100)) + drift * 60, y: 0, z: 1.02 + drift * 0.08, r: 0 };
-        const off = 4200 * 1.6 + (Math.min(t, 6100) - 4200) * 1.9 + (t > 6100 ? (1 - Math.pow(1 - stop, 2)) * 400 : 0);
-        c.save(); cam(c, k, 0.2); layer(c, s.nightCity); c.restore();
-        c.save(); cam(c, k, 1); nightRoad(c, t, off);
-        // 嫌犯在前方逃跑（車停下後被擋住）
-        const fx = t < 6100 ? lerp(1500, 1180, prog(t, 4200, 6100)) : 1180 - drift * 60;
-        foe(c, s.enMain, fx, 800 + (t < 6100 ? Math.abs(Math.sin(t * 0.02)) * -14 : 0), 360, { rot: t < 6100 ? 0.08 : -0.05 * drift });
-        const cx = t < 6100 ? lerp(200, 640, prog(t, 4200, 6100)) : 640 + drift * 180;
-        c.save(); c.translate(cx, 830); c.rotate(-drift * 0.32); policeCar(c, t, 0, 0, 1.05, false, 0, t < 6100 ? Math.sin(t * 0.05) * 2 : 0); c.restore();
-        smokePuffs(c, t, 6100, cx - 200, 820, 10, prog(t, 6100, 6300) * (1 - prog(t, 7200, 7600)));
+      if (t < 8450) {   // 越過引擎蓋：鏡頭推向前方逃竄的嫌犯 → 強力轉場
+        const chase = prog(t, 6300, 8200), zE = lerp(7.5, 1.55, eio(chase)), push = eio(prog(t, 7400, 8250));
+        const ex = VPX + Math.sin(t * 0.004) * 90 * (1 - push), ey = HZ + 430 / zE, eh = 1500 / zE;
+        const k = { x: (ex - VPX) * push * 0.8, y: (ey - eh * 0.55 - 450) * push * 0.8, z: 1 + push * 1.3, r: Math.sin(t * 0.004) * 0.012 };
+        c.save(); cam(c, k, 0.15); c.translate(0, -170); layer(c, s.nightCity); c.restore();
+        c.save(); cam(c, k, 1); chaseRoad(c, t, t * 3.2, { lamp: 0.8 });
+        c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5;   // 車頭燈的光錐
+        [[-1], [1]].forEach(([sd]) => { c.fillStyle = lin(c, 0, H, 0, HZ, [[0, 'rgba(255,250,220,.55)'], [1, 'rgba(255,250,220,0)']]); poly(c, [[VPX + sd * 380, H + 40], [VPX + sd * 120, H + 40], [VPX + sd * 10, HZ + 20], [VPX + sd * 60, HZ + 20]]); c.fill(); });
         c.restore();
-        sirenWash(c, t, 0.45 + drift * 0.35);
-        // 她下車：立繪從右側滑入
-        const ap = eo(prog(t, 6900, 7400));
-        if (ap > 0) heroDraw(c, H0, 'lit', lerp(1750, 1250, ap), 300, 1200, { alpha: ap });
+        foe(c, s.enMain, ex, ey + Math.abs(Math.sin(t * 0.022)) * -12 / zE * 4, eh, { rot: Math.sin(t * 0.022) * 0.05, flip: t > 7600 });
+        c.restore();
+        c.fillStyle = lin(c, 0, 760, 0, H, [[0, '#dfe6f0'], [0.4, '#aab6c8'], [1, '#56607a']]);   // 引擎蓋
+        c.beginPath(); c.moveTo(-60, H + 10); c.quadraticCurveTo(VPX, 690, W + 60, H + 10); c.closePath(); c.fill();
+        c.fillStyle = 'rgba(70,120,255,.35)'; c.beginPath(); c.moveTo(VPX - 420, H); c.quadraticCurveTo(VPX, 760, VPX + 420, H); c.closePath(); c.fill();
+        c.save(); c.strokeStyle = 'rgba(200,220,255,.4)'; c.lineWidth = 2;
+        for (let i = 0; i < 36; i++) { const y = 60 + hash(i) * 640, x = ((W - (t * (2.6 + hash(i + 1) * 2) + hash(i + 2) * 2000) % (W + 400))); c.globalAlpha = 0.4 + chase * 0.5; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 200 + chase * 200, y); c.stroke(); }
+        c.restore();
+        sirenWash(c, t, 0.4 + push * 0.3);
+        // 轉場：車燈爆白 → 紅藍兩片斜切面板從兩側合攏，切到警局門口
+        const wp = eio(prog(t, 8150, 8450));
+        if (wp > 0) {
+          c.fillStyle = '#c8102a'; poly(c, [[-200, -100], [lerp(-200, 980, wp), -100], [lerp(-460, 720, wp), H + 100], [-200, H + 100]]); c.fill();
+          c.fillStyle = '#1238c8'; poly(c, [[W + 200, -100], [lerp(W + 460, 880, wp), -100], [lerp(W + 200, 620, wp), H + 100], [W + 200, H + 100]]); c.fill();
+          c.strokeStyle = '#ffffff'; c.lineWidth = 10; c.beginPath(); c.moveTo(lerp(-200, 980, wp), -100); c.lineTo(lerp(-460, 720, wp), H + 100); c.moveTo(lerp(W + 460, 880, wp), -100); c.lineTo(lerp(W + 200, 620, wp), H + 100); c.stroke();
+        }
+        full(c, '#ffffff', bump(t, 8300, 160));
         vignette(c, 0.55, 'rgba(2,4,14,1)');
         return;
       }
-      if (t < 9300) {   // 執勤：風刃橫掃 → 押送
-        const k = { x: 0, y: 0, z: 1.06 + prog(t, 7600, 8600) * 0.06, r: -0.01 };
-        c.save(); cam(c, k, 0.25); layer(c, s.nightCity); c.restore();
-        c.save(); cam(c, k, 1); nightRoad(c, t, 9000, { lamp: 0.6 }); policeCar(c, t, 260, 830, 1.0, false, 0, 0); c.restore();
-        const hit = t > 8650, kb = eo(prog(t, 8650, 9100));
-        [[1020, 0, 330], [1220, 1, 380], [1420, 2, 330]].forEach(([x, i, h]) => foe(c, i === 1 ? s.enMain : s.enShade, x + kb * (i - 1) * 120 + kb * 160, 820 - kb * 40 * (i === 1 ? 0 : 1), h, { rot: kb * (i - 1 || 0.3) * 0.5, alpha: 1 }));
-        // 蓄力：立繪左側特寫、風捲起
-        const ap = eo(prog(t, 7600, 8000)) * (1 - prog(t, 8500, 8700));
-        if (ap > 0) heroDraw(c, H0, 'lit', lerp(250, 420, ap), 280, 1500, { alpha: ap });
-        c.save(); c.strokeStyle = 'rgba(160,255,215,.7)'; c.lineWidth = 3; c.lineCap = 'round';
-        for (let i = 0; i < 14; i++) { const a0 = t * 0.006 + i, r = 120 + i * 26; c.globalAlpha = 0.6 * prog(t, 7700, 8200) * (1 - prog(t, 8600, 8900)); c.beginPath(); c.arc(420, 520, r, a0, a0 + 0.9); c.stroke(); }
-        c.restore();
-        // 風刃
-        if (t > 8500) {
-          const p = eo(prog(t, 8500, 8680)), w = 70 * (1 - prog(t, 8700, 9200));
-          if (w > 0) D().blade(c, -100, 600, lerp(-100, W + 200, p), 520, w, '#f2fff9', '#5fe3a8');
-          const wp = eo(prog(t, 8650, 9200));
-          c.save(); c.globalAlpha = 1 - wp; c.strokeStyle = '#bff7df'; c.lineWidth = 16 * (1 - wp) + 1; c.beginPath(); c.ellipse(1220, 640, 900 * wp, 260 * wp, 0, 0, TAU); c.stroke(); c.restore();
-        }
-        // 押送：手銬的紅藍雙環扣上
-        const cp = eo(prog(t, 8950, 9150));
-        if (cp > 0) {
-          [[-1, '#ff3a4a'], [1, '#3a7aff']].forEach(([sd, col]) => { c.save(); c.strokeStyle = col; c.lineWidth = 10; c.shadowColor = col; c.shadowBlur = 24; c.beginPath(); c.arc(1220 + kb * 160 + sd * lerp(220, 34, cp), 640, 60, 0, TAU); c.stroke(); c.restore(); });
-          c.save(); c.globalAlpha = cp; c.fillStyle = '#ffffff'; c.font = '900 30px "Arial Black", Arial, sans-serif'; c.textAlign = 'center'; c.fillText('IN CUSTODY', 1220 + kb * 160, 760); c.restore();
-        }
-        full(c, '#ffffff', 0.8 * bump(t, 8660, 180));
-        sirenWash(c, t, 0.4);
-        vignette(c, 0.55, 'rgba(2,4,14,1)');
-        return;
+      // 警局門口：嫌犯已被押上台階，凱恩在門口接手；倚著警車的她、飄落的罰單
+      const k = { x: 0, y: 0, z: 1.12 - eo(prog(t, 8450, 9300)) * 0.08 - prog(t, 9300, 12200) * 0.03, r: 0 };
+      c.save(); cam(c, k, 0.85); layer(c, s.station); c.restore();
+      c.save(); cam(c, k, 0.85);
+      const D0 = s.stationDoor;
+      if (s.K) { c.save(); c.beginPath(); c.rect(D0.x - 136, D0.top, 272, D0.base - D0.top); c.clip(); heroDraw(c, s.K, 'day', D0.x + 20, D0.top + 120, 820); c.restore(); }
+      const walk = prog(t, 8450, 11200), sx = lerp(760, D0.x + 30, walk), sy = lerp(735, D0.base + 6, walk);
+      if (s.enMain) {
+        foe(c, s.enMain, sx, sy, 300, { alpha: 1 - prog(t, 10900, 11400) });
+        const cp = eo(prog(t, 9400, 9600));   // 手銬扣上：紅藍雙環
+        if (cp > 0) [[-1, '#ff3a4a'], [1, '#3a7aff']].forEach(([sd, col]) => { c.save(); c.globalAlpha = 1 - prog(t, 10900, 11400); c.strokeStyle = col; c.lineWidth = 5; c.shadowColor = col; c.shadowBlur = 12; c.beginPath(); c.arc(sx + sd * lerp(60, 14, cp), sy - 150, 16, 0, TAU); c.stroke(); c.restore(); });
+        officer(c, t, sx + 80, sy + 10, 0.62, 'radio', true, 3);
       }
-      // 定格：警燈下的她、飄落的罰單
-      const k = { x: 0, y: 0, z: 1.08 - prog(t, 9300, 11500) * 0.05, r: 0 };
-      c.save(); cam(c, k, 0.25); layer(c, s.nightCity); c.restore();
-      c.save(); cam(c, k, 1); nightRoad(c, t, 9000, { lamp: 0.7 }); if (!s.H2) policeCar(c, t, 360, 840, 1.1, false, 0, 0); tape(c, t, 700, 760, 6); c.restore();
-      sirenWash(c, t, 0.7);
-      c.save(); cam(c, k, 1.08);
-      if (s.H2) {   // 倚著警車的立繪：車頂燈條跟著紅藍交替
-        const fx = 1170, fy = 250, h = 1250, a = s.H2.a, sc = h / a.h;
-        heroDraw(c, s.H2, 'lit', fx, fy, h);
-        const bx = fx + (0.36 * a.w - a.facePx[0]) * sc, by = fy + (0.39 * a.h - a.facePx[1]) * sc, r = 0.5 + 0.5 * Math.sin(t * 0.03);
-        c.save(); c.globalCompositeOperation = 'lighter';
-        [[-60, `rgba(255,60,70,${0.55 * r})`], [70, `rgba(70,120,255,${0.55 * (1 - r)})`]].forEach(([dx, col]) => { const g = c.createRadialGradient(bx + dx, by, 0, bx + dx, by, 160); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(bx + dx - 160, by - 160, 320, 320); });
-        c.restore();
-      } else heroDraw(c, H0, 'lit', 1180, 300, 1250);
+      officer(c, t, 360, 812, 0.72, 'hips', false, 1); officer(c, t, 900, 812, 0.72, 'cross', true, 2);
+      policeCar(c, t, 150, 900, 0.7, false, 120);
+      c.restore();
+      sunFlare(c, k, 0.55);
+      c.save(); cam(c, k, 1.05);
+      if (s.H2) heroDraw(c, s.H2, 'day', 1230, 260, 1240);
+      else heroDraw(c, H0, 'lit', 1230, 300, 1200);
       c.restore();
       s.cites.forEach((p, i) => {
-        const dt = t - 9300, x = p.x + p.vx * dt, y = p.y + p.vy * dt;
-        if (y > H + 60) return;
+        const dt = t - 10200, x = p.x + p.vx * dt, y = p.y + p.vy * dt;
+        if (dt < 0 || y > H + 60) return;
         c.save(); c.translate(x, y); c.rotate(p.r + p.vr * dt); c.scale(1, Math.cos(dt * 0.004 + i));
         c.fillStyle = '#f6f3ea'; c.fillRect(-26, -36, 52, 72); c.fillStyle = '#d32a3a'; c.fillRect(-26, -36, 52, 13);
         c.fillStyle = 'rgba(40,44,60,.5)'; for (let j = 0; j < 4; j++) c.fillRect(-18, -14 + j * 11, j === 3 ? 20 : 36, 3);
         c.restore();
       });
-      vignette(c, 0.5, 'rgba(2,4,14,1)');
-      heroTitle(c, t, 9600, { band: '10,40,32', accent: '#5fe3a8', en: 'SPEED & DUTY', zh: '速度與執勤', sub: 'ALEXANDRA ／ 布魯克林警署', subX: 290, zhCol: '#d9fff0' });
+      full(c, '#ffffff', 1 - prog(t, 8450, 8750));
+      vignette(c, 0.35, 'rgba(8,18,40,1)');
+      heroTitle(c, t, 10400, { band: '10,40,32', accent: '#5fe3a8', en: 'SPEED & DUTY', zh: '速度與執勤', sub: 'ALEXANDRA ／ 布魯克林警署', subX: 290, zhCol: '#d9fff0' });
     },
   };
 

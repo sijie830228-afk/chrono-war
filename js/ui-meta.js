@@ -66,8 +66,8 @@ function openLive(uid) {
     h += `<h2>${esc(c.fullName || c.name)} <small class="hint">即時數值（第 ${Engine.cycle()} 輪）</small></h2>
       <div class="statgrid">${[
       row('生命', `${fmt(L.hp)} / ${fmt(L.maxHp)}`), row('攻擊力', fmt(L.atk)), row('防禦力', fmt(L.def)), row('速度', L.spd.toFixed(1)),
-      row('暴擊率', P1(L.cr)), row('暴擊傷害', P1(L.cd)), row('造成傷害', '+' + P1(L.dmgBonus)), row('擊破特攻', P1(L.be)),
-      row('擊破效率', '+' + P1(L.breakEff)), row('效果命中', P1(L.ehr)), row('效果抵抗', P1(L.effRes)), row('能量恢復效率', P1(L.err)),
+      row('暴擊率', P1(L.cr)), row('暴擊傷害', P1(L.cd)), row('造成傷害', '+' + P1(L.dmgBonus)),
+      row('效果命中', P1(L.ehr)), row('效果抵抗', P1(L.effRes)), row('能量恢復效率', P1(L.err)),
       row('受到傷害', '−' + P1(L.dmgTakenRed)), row('無視防禦', P1(L.defIgnore)), row('能量', `${L.energy.toFixed(1)} / ${L.maxEnergy}`),
       row('行動值', L.av.toFixed(1)), row('護盾', L.shield > 0 ? `${fmt(L.shield)}（${L.shieldDur} 回合）` : '—'),
     ].join('')}</div>`;
@@ -140,7 +140,7 @@ function panelGrid(k, override) {
   const p = Meta.panel(k, CFG, override);
   return [['攻擊力', fmt(p.atk)], ['生命', fmt(p.hp)], ['防禦', fmt(p.def)], ['速度', p.spd.toFixed(1)], ['暴擊率', P1(p.cr)],
     ['暴擊傷害', P1(p.cd)], [ELEM_NAME[CHARS[k].elem] + '屬性增傷', P1(p.dmgBonus)], ['效果命中', P1(p.ehr)], ['效果抵抗', P1(p.effRes)],
-    ['擊破特攻', P1(p.be)], ['能量恢復效率', P1(p.err)]];
+    ['能量恢復效率', P1(p.err)]];
 }
 function tabDetail(k, SV) {
   const info = CHAR_INFO[k], base = CFG.chars[k];

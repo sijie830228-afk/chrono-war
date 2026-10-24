@@ -277,10 +277,36 @@ const Sound = (() => {
       boom(t + 0.25, 0.45, { f: 80, nf: 1600, dur: 0.6, crackle: 6 });
       chord([60, 67, 72], t + 0.28, 0.7, 0.05, { type: 'sawtooth', filter: 'lowpass', f: 2600, f2: 700, verb: 0.4 });
     },
+    // 兌現匣上膛：金屬「喀－嚓」兩段，尾音依屬性略有不同
+    chamber: (t, o) => {
+      const e = o.e || 'phys';
+      noise(t, 0.022, 0.32, { filter: 'highpass', f: 3200, a: 0.0005 });
+      tone(e === 'phys' ? 210 : 260, t, 0.05, 0.16, { type: 'square', f2t: 90, filter: 'lowpass', f: 1800, a: 0.001 });
+      noise(t + 0.055, 0.03, 0.26, { f: 2400, q: 2, a: 0.0005 });
+      tone(170, t + 0.055, 0.06, 0.12, { type: 'triangle', f2t: 70, a: 0.001 });
+      const u = t + 0.07;
+      if (e === 'fire') noise(u, 0.18, 0.08, { filter: 'highpass', f: 2500, rate: 0.7 });
+      else if (e === 'water') tone(700, u, 0.12, 0.05, { f2t: 1500, gdur: 0.08 });
+      else if (e === 'wind') noise(u, 0.2, 0.07, { f: 900, f2: 3200, q: 1 });
+      else if (e === 'thunder') tone(1400, u, 0.07, 0.035, { type: 'sawtooth', f2t: 300, filter: 'lowpass', f: 4000 });
+      else if (e === 'ice') bell(rnd(3200, 3800), u, 0.22, 0.04, { ratio: 2.4, verb: 0.3 });
+      else if (e === 'grass') tone(420, u, 0.09, 0.06, { type: 'triangle', f2t: 520 });
+      else bell(1250, u, 0.14, 0.03, { ratio: 1.4 });
+    },
+    // 莫卡兄弟遞出契約：紙張滑過 → 蓋章
+    contract: t => { noise(t, 0.22, 0.08, { f: 2600, f2: 1200, q: 0.8, a: 0.03 }); tone(150, t + 0.62, 0.12, 0.2, { f2t: 70, a: 0.002 }); noise(t + 0.62, 0.06, 0.12, { filter: 'lowpass', f: 900 }); bell(mtof(86), t + 0.7, 0.4, 0.03, { ratio: 2.4, verb: 0.4 }); },
+    // 代理執行-弟：一疊單據撒出 → 清脆的入帳聲
+    budget: t => { for (let i = 0; i < 5; i++) noise(t + i * 0.05, 0.1, 0.05, { f: 3000, f2: 1500, q: 1, a: 0.01 }); [79, 83, 86].forEach((m, i) => bell(mtof(m), t + 0.6 + i * 0.06, 0.5, 0.035, { ratio: 2, verb: 0.4 })); },
+    // 阿蘭展開護盾：信號彈點火 → 護盾嗡鳴
+    barrier: t => { noise(t, 0.3, 0.1, { f: 900, f2: 3200, q: 1, a: 0.01 }); tone(220, t + 0.12, 0.7, 0.06, { type: 'triangle', f2t: 440, a: 0.08 }); tone(330, t + 0.18, 0.6, 0.04, { type: 'sine', vib: [7, 6] }); },
     mkUp: t => { [0, 0.05, 0.1].forEach((d, i) => tone(mtof(76 + i * 4), t + d, 0.1, 0.05, { type: 'square', filter: 'lowpass', f: 3000 })); bell(mtof(88), t + 0.16, 0.4, 0.05, { ratio: 2, verb: 0.3 }); },
     mkDown: t => { [0, 0.05, 0.1].forEach((d, i) => tone(mtof(72 - i * 4), t + d, 0.12, 0.05, { type: 'square', filter: 'lowpass', f: 2200 })); tone(140, t + 0.14, 0.3, 0.15, { f2t: 60 }); },
     atk_enemy: t => { swish(t, 0.22, 1800, 500, 0.2); noise(t, 0.08, 0.05, { filter: 'lowpass', f: 400 }); },
 
+    // 收網：證物定位、繃緊的弦、低頻與斷弦同時落下。
+    netPin: t => { [0,.045,.09].forEach(d => { noise(t+d,.022,.1,{filter:'highpass',f:4200}); tone(1800,t+d,.035,.035,{type:'square',filter:'bandpass',f:2300}); }); },
+    netPull: t => { tone(260,t,.27,.08,{type:'triangle',f2t:1450,a:.02}); noise(t,.25,.1,{f:650,f2:4200,q:4,a:.2}); },
+    netSnap: t => { kick(t,.72,sfxBus,{f:135,f2:32,dur:.22}); noise(t,.045,.32,{filter:'highpass',f:3000,a:.001}); tone(1500,t,.09,.06,{type:'triangle',f2t:220}); },
     // 命中
     hit: (t, o) => {
       const e = o.elem || 'phys';
@@ -323,10 +349,21 @@ const Sound = (() => {
     },
     hurt: t => { tone(100, t, 0.25, 0.4, { f2t: 55, a: 0.002 }); noise(t, 0.14, 0.18, { filter: 'lowpass', f: 1100 }); },
     absorb: t => { bell(740, t, 0.3, 0.07, { ratio: 1.5, verb: 0.3 }); noise(t, 0.12, 0.06, { filter: 'highpass', f: 3000 }); },
-    dot: t => { noise(t, 0.26, 0.2, { f: 800, f2: 260, q: 4 }); tone(170, t, 0.22, 0.15, { f2t: 80, type: 'triangle' }); },
+    // 持續傷害：依種類各有音色（裂傷鋒利、血破濕潤噴濺、原罪沉重、悲悼是遠處的鐘）
+    dot: (t, o) => {
+      const k = o.type;
+      if (k === 'lacer') { noise(t, 0.09, 0.14, { filter: 'highpass', f: 5200, a: 0.001 }); tone(2600, t, 0.12, 0.025, { type: 'triangle', f2t: 3400 }); tone(150, t + 0.02, 0.12, 0.08, { f2t: 70 }); }
+      else if (k === 'bloodBreak') { noise(t, 0.28, 0.24, { f: 900, f2: 300, q: 2, a: 0.002 }); for (let i = 0; i < 5; i++) noise(t + 0.06 + i * 0.03, 0.05, 0.07, { filter: 'lowpass', f: 700, rate: 0.6 }); tone(110, t, 0.25, 0.16, { f2t: 50 }); }
+      else if (k === 'original') { noise(t, 0.12, 0.12, { filter: 'highpass', f: 3000, a: 0.001 }); tone(98, t, 0.5, 0.16, { type: 'sawtooth', f2t: 46, filter: 'lowpass', f: 600 }); bell(mtof(50), t + 0.04, 0.8, 0.03, { ratio: 1.41, verb: 0.5 }); }
+      else if (k === 'mourn') { bell(mtof(62), t, 1.0, 0.03, { ratio: 2.76, index: 0.6, verb: 0.7 }); noise(t, 0.3, 0.04, { filter: 'highpass', f: 4000 }); }
+      else if (k === 'fire') { noise(t, 0.3, 0.12, { filter: 'highpass', f: 2200, rate: 0.7 }); tone(160, t, 0.2, 0.08, { f2t: 90 }); }
+      else if (k === 'thunder') { tone(1300, t, 0.1, 0.04, { type: 'sawtooth', f2t: 260, filter: 'lowpass', f: 3800 }); noise(t, 0.12, 0.1, { f: 3000, q: 1.5 }); }
+      else { noise(t, 0.26, 0.2, { f: 800, f2: 260, q: 4 }); tone(170, t, 0.22, 0.15, { f2t: 80, type: 'triangle' }); }
+    },
     break: t => { tone(80, t, 0.5, 0.5, { f2t: 35, a: 0.002 }); shatter(t + 0.02, 0.5, { n: 20 }); },
     kill: t => { tone(220, t, 0.7, 0.2, { type: 'sawtooth', f2t: 40, filter: 'lowpass', f: 900 }); noise(t, 0.6, 0.16, { filter: 'lowpass', f: 900, f2: 120, verb: 0.3 }); },
     heal: t => { [72, 76, 79, 84].forEach((m, i) => bell(mtof(m), t + i * 0.06, 0.6, 0.06, { ratio: 2, index: 0.8, verb: 0.55 })); },
+    healSoft: t => { bell(mtof(79), t, 0.35, 0.018, { ratio: 2, index: 0.6, verb: 0.4 }); },
     shield: t => { tone(420, t, 0.4, 0.07, { type: 'triangle', f2t: 950, a: 0.08 }); bell(1400, t + 0.2, 0.5, 0.05, { ratio: 1.5, verb: 0.5 }); noise(t, 0.35, 0.05, { f: 1500, f2: 5000, q: 2, a: 0.2 }); },
     buff: t => { bell(1320, t, 0.3, 0.035, { ratio: 2, index: 0.8, verb: 0.35 }); },
     stun: t => { [0, 0.06, 0.13].forEach(d => tone(rnd(900, 1400), t + d, 0.12, 0.06, { type: 'square', filter: 'bandpass', f: 2600, q: 5 })); noise(t, 0.2, 0.08, { f: 3000, q: 3 }); },

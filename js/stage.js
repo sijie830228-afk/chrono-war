@@ -4,6 +4,7 @@
  * 夜空、月亮、星星、雲霧、三層城市剪影（隨機窗燈）、直立霓虹招牌、
  * 兩側近景建築、路燈、濕潤街道上的霓虹倒影、地平線霧氣。
  * 使用固定亂數種子，每次畫面一致；尺寸改變時自動重畫。
+ * 彩蛋：O.T.G. 處於「瀆神之軀」時，滿月被月蝕的陰影掃過、轉為血月（.stage.blood-moon，樣式在 style.css）。
  * ========================================================= */
 
 const Stage = (() => {
@@ -91,6 +92,9 @@ const Stage = (() => {
     const disc = g.createRadialGradient(mx - mr * 0.3, my - mr * 0.3, mr * 0.1, mx, my, mr);
     disc.addColorStop(0, '#fbfcff'); disc.addColorStop(1, '#c9d3ee');
     g.fillStyle = disc; g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.fill();
+    // 血月彩蛋（O.T.G. 的瀆神之軀）疊在同一個位置：把月亮的座標交給 CSS
+    const host = cv.parentElement;
+    if (host) { host.style.setProperty('--mx', mx + 'px'); host.style.setProperty('--my', my + 'px'); host.style.setProperty('--mr', mr + 'px'); }
     g.fillStyle = 'rgba(120,130,170,.18)';
     [[0.3, -0.2, 0.22], [-0.35, 0.25, 0.16], [0.1, 0.4, 0.12]].forEach(([dx, dy, r]) => { g.beginPath(); g.arc(mx + dx * mr, my + dy * mr, r * mr, 0, Math.PI * 2); g.fill(); });
     // 雲霧
