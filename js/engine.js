@@ -121,7 +121,7 @@ const DEFAULT_CONFIG = {
     toughness: false,   // 韌性與弱點擊破（舊機制，目前關閉）
     cashbox: true,      // 本質權能：兌現匣
   },
-  ui: { anim: true, speed: 1, autoInterval: 600 },
+  ui: { anim: true, speed: 1, autoInterval: 600, raidenSkin: 'raiden' },
 };
 
 
@@ -172,6 +172,7 @@ const Engine = (() => {
    *   dotTick         {u}                             敵人回合開始，結算持續傷害
    *   enemyAction     {u}                             敵人行動之後（在此排入追加攻擊、反擊）
    *   turnEnd         {u}                             回合結束，持續時間遞減之前
+   *   actionConfirm   {u, kind}                       確認普攻／戰技後，正式施放之前（代理執行）
    *   beforeAction    {u, kind}                       我方行動（basic / skill / ult）之前
    *   afterAction     {u, kind}                       我方行動的技能效果結算完畢
    *   beforeHit       {att, tgt, o, mod}              每段傷害計算前；累加 mod.dmg（增傷）、mod.cd（暴傷）
@@ -431,7 +432,7 @@ const Engine = (() => {
     const tail = `${fmt(dmg)} ${ELEM_NAME[o.elem]}傷害${crit ? ' 💥' : ''}${absorbed ? `（護盾吸收 ${fmt(absorbed)}）` : ''}`;
     log(o.dot ? 'dot' : (att.side === 'ally' ? 'dmg' : 'hurt'),
       up ? `${att.name}【${o.label}】${tail}` : `${att.name}【${o.label}】→ ${tgt.name}：${tail}`,
-      detail, { kind: o.dot ? 'dot' : 'dmg', src: att.id, tgt: tgt.id, amt: dmg - absorbed, absorbed, crit, elem: o.elem, line: !o.dot && !o.breakDmg && !up, fast: o.fast || undefined, sub: up ? true : undefined, up: up || undefined,
+      detail, { kind: o.dot ? 'dot' : 'dmg', src: att.id, tgt: tgt.id, amt: dmg - absorbed, absorbed, crit, elem: o.elem, line: !o.dot && !o.breakDmg && !up, fast: o.fast || undefined, ...(o.fxGroup && !o.dot && !up ? o.fxGroup : {}), sub: up ? true : undefined, up: up || undefined,
         ...(o.dot ? { dotType: o.dotType || (/原罪/.test(o.label) ? 'original' : /血破/.test(o.label) ? 'bloodBreak' : /悲悼/.test(o.label) || o.elem === 'sorrow' ? 'mourn' : /裂傷/.test(o.label) ? 'lacer' : o.elem), dotStage: o.dotStage || 1 } : {}) });
 
     const eventIdx = S.log.length - 1;
@@ -465,14 +466,19 @@ const Engine = (() => {
     targets = targets.filter(t => t && t.alive);
     const marked = targets.filter(t => t.peek || t.flagrant);
     const o = Object.assign({ mult, elem, label }, extra || {});
-    targets.forEach(t => dealDamage(att, t, Object.assign({}, o)));
+    // 群體攻擊：同一次動作的命中標成同一組，介面一次播出角色自己的群體特效（不影響結算）
+    const grp = targets.length > 1 && !o.fast ? { grp: S.log.length + 1, area: 'aoe' } : null;
+    targets.forEach(t => dealDamage(att, t, Object.assign({}, o, grp ? { fxGroup: grp } : {})));
     emit('afterAttack', { att, targets, marked, o });
   }
   /** 倍率不同的多段攻擊（例如主目標＋擴散）仍視為同一次攻擊動作 */
   function attackEach(att, hits, extra) {
     const targets = hits.map(h => h.t).filter(t => t && t.alive);
     const marked = targets.filter(t => t.peek || t.flagrant);
-    hits.forEach(h => dealDamage(att, h.t, Object.assign({ mult: h.mult, base: h.base, note: h.note, label: h.label, tough: h.tough }, extra)));
+    // 擴散（第一筆為主目標、其餘標籤不同）或群體（每筆標籤相同）：同樣標成同一組
+    const grp = hits.filter(h => h.t && h.t.alive).length > 1 && !(extra && extra.fast) ? S.log.length + 1 : 0;
+    const area = hits.every(h => h.label === hits[0].label) ? 'aoe' : 'blast';
+    hits.forEach((h, i) => dealDamage(att, h.t, Object.assign({ mult: h.mult, base: h.base, note: h.note, label: h.label, tough: h.tough }, extra, grp ? { fxGroup: { grp, area, main: area === 'blast' && i === 0 } } : {})));
     emit('afterAttack', { att, targets, marked, o: extra });
   }
 
@@ -509,9 +515,9 @@ const Engine = (() => {
   function checkEnd() {
     if (!enemies().length) {
       if (S.wave < S.waves.length - 1) { spawnWave(S.wave + 1); return false; }
-      S.phase = 'win'; log('sys', `🏆 勝利！共 ${S.waves.length} 波，經過 ${cycle() + 1} 輪，行動值 ${fmt(S.time)}`); return true;
+      S.phase = 'win'; S.turnWindow = null; log('sys', `🏆 勝利！共 ${S.waves.length} 波，經過 ${cycle() + 1} 輪，行動值 ${fmt(S.time)}`); return true;
     }
-    if (!allies().length) { S.phase = 'lose'; log('sys', '💀 全員倒下，戰鬥失敗'); return true; }
+    if (!allies().length) { S.phase = 'lose'; S.turnWindow = null; log('sys', '💀 全員倒下，戰鬥失敗'); return true; }
     return false;
   }
 
@@ -531,8 +537,8 @@ const Engine = (() => {
    *   兌現匣收滿 10 份就「兌現」一次（多出來的留給下一次）：
    *     數量最多的元素 → 形制（攻擊形式），次多的元素 → 裝填（附加效果）；數量相同時，先投入的元素優先。
    *     10 份全是同一種元素 → 原型兌現（更強的專屬效果）。
-   *   兌現由兌現匣本身發動（不是隊友）：兌現匣的攻擊力與擊破特攻 = 這批 10 份餘料投入者的加權平均（依份數），
-   *   傷害 = 兌現匣攻擊力 × 倍率 × (1 + 擊破特攻)，不會暴擊，也不吃角色的增傷與套裝。
+   *   兌現由兌現匣本身發動（不是隊友）：兌現匣的攻擊力 = 這批 10 份餘料投入者的加權平均（依份數），
+   *   傷害 = 兌現匣攻擊力 × 倍率，不會暴擊，也不吃角色的增傷與套裝。
    * ========================================================= */
   const RESIDUE = { basic: 1, skill: 2, ult: 3 };
   const CASH_CAP = 10;
@@ -540,14 +546,14 @@ const Engine = (() => {
   const cashOn = () => S.rules.cashbox !== false;
   /** 形制：回傳這次兌現的命中清單 [{ t, mult }]；after 為命中後的額外處理 */
   const CASH_FORM = {
-    phys:    { name: '重錘', desc: '對生命值最高的敵方單體造成 360% 物理屬性傷害。', hits: es => [{ t: highestHp(es), mult: 3.6 }] },
-    fire:    { name: '爆燃', desc: '對主目標造成 200%、其相鄰目標造成 100% 火屬性傷害。',
+    phys:    { aim: 'hp', name: '重錘', desc: '對生命值最高的敵方單體造成 360% 物理屬性傷害。', hits: es => [{ t: highestHp(es), mult: 3.6 }] },
+    fire:    { aim: 'adj', name: '爆燃', desc: '對主目標造成 200%、其相鄰目標造成 100% 火屬性傷害。',
       hits: (es, m) => { const i = es.indexOf(m); return [{ t: m, mult: 2.0 }].concat([es[i - 1], es[i + 1]].filter(Boolean).map(t => ({ t, mult: 1.0 }))); } },
-    water:   { name: '潮湧', desc: '對敵方全體造成 120% 水屬性傷害。', hits: es => es.map(t => ({ t, mult: 1.2 })) },
-    wind:    { name: '迴旋', desc: '進行 6 次彈射，每次對隨機敵方單體造成 60% 風屬性傷害。', hits: es => Array.from({ length: 6 }, () => ({ t: rand(es), mult: 0.6 })) },
-    thunder: { name: '連鎖', desc: '對主目標造成 180% 雷屬性傷害，並連鎖至其餘每名敵人各 90%。', hits: (es, m) => [{ t: m, mult: 1.8 }].concat(es.filter(e => e !== m).map(t => ({ t, mult: 0.9 }))) },
-    ice:     { name: '霜錐', desc: '對主目標造成 260% 冰屬性傷害，並使其行動延後 20%。', hits: (es, m) => [{ t: m, mult: 2.6 }], after: ts => ts.forEach(e => e.alive && delay(e, 0.2)) },
-    grass:   { name: '蔓生', desc: '對敵方全體造成 100% 草屬性傷害。', hits: es => es.map(t => ({ t, mult: 1.0 })) },
+    water:   { aim: 'all', name: '潮湧', desc: '對敵方全體造成 120% 水屬性傷害。', hits: es => es.map(t => ({ t, mult: 1.2 })) },
+    wind:    { aim: 'rand', name: '迴旋', desc: '進行 6 次彈射，每次對隨機敵方單體造成 60% 風屬性傷害。', hits: es => Array.from({ length: 6 }, () => ({ t: rand(es), mult: 0.6 })) },
+    thunder: { aim: 'chain', name: '連鎖', desc: '對主目標造成 180% 雷屬性傷害，並連鎖至其餘每名敵人各 90%。', hits: (es, m) => [{ t: m, mult: 1.8 }].concat(es.filter(e => e !== m).map(t => ({ t, mult: 0.9 }))) },
+    ice:     { aim: 'main', name: '霜錐', desc: '對主目標造成 260% 冰屬性傷害，並使其行動延後 20%。', hits: (es, m) => [{ t: m, mult: 2.6 }], after: ts => ts.forEach(e => e.alive && delay(e, 0.2)) },
+    grass:   { aim: 'all', name: '蔓生', desc: '對敵方全體造成 100% 草屬性傷害。', hits: es => es.map(t => ({ t, mult: 1.0 })) },
   };
   const debuffOn = (ts, name, dur, stats) => ts.filter(e => e.alive).forEach(e => addBuff(e, { name, dur, debuff: true, stats }));
   /** 裝填：次多元素的附加效果（u = 結算者，ts = 被命中的敵人） */
@@ -562,13 +568,13 @@ const Engine = (() => {
   };
   /** 原型兌現：10 份同元素 */
   const CASH_PROTO = {
-    phys:    { name: '斷頭台', desc: '對主目標造成 800% 物理屬性傷害。', hits: (es, m) => [{ t: m, mult: 8.0 }] },
-    fire:    { name: '焚城', desc: '對敵方全體造成 300% 火屬性傷害，並使其受到的傷害提高 20%，持續 2 回合。', hits: es => es.map(t => ({ t, mult: 3.0 })), after: ts => debuffOn(ts, '焚城', 2, { dmgTakenUp: 0.20 }) },
-    water:   { name: '海嘯', desc: '對敵方全體造成 250% 水屬性傷害，我方全體回復 15% 最大生命。', hits: es => es.map(t => ({ t, mult: 2.5 })), after: (ts, u) => allies().forEach(a => heal(u, a, 0.15 * a.maxHp)) },
-    wind:    { name: '颶風眼', desc: '進行 12 次彈射，每次 70% 風屬性傷害，隨後我方全體行動提前 20%。', hits: es => Array.from({ length: 12 }, () => ({ t: rand(es), mult: 0.7 })), after: () => allies().forEach(a => advance(a, 0.20)) },
-    thunder: { name: '天罰', desc: '對敵方全體造成 280% 雷屬性傷害，並使其行動延後 30%。', hits: es => es.map(t => ({ t, mult: 2.8 })), after: ts => ts.filter(e => e.alive).forEach(e => delay(e, 0.3)) },
-    ice:     { name: '絕對零度', desc: '對敵方全體造成 220% 冰屬性傷害，並使其造成的傷害降低 40%，持續 2 回合。', hits: es => es.map(t => ({ t, mult: 2.2 })), after: ts => debuffOn(ts, '絕對零度', 2, { dmgDealtRed: 0.40 }) },
-    grass:   { name: '萬物生', desc: '對敵方全體造成 200% 草屬性傷害，我方全體恢復 20 點能量，並恢復 1 個戰技點。', hits: es => es.map(t => ({ t, mult: 2.0 })), after: () => { allies().forEach(a => gainEnergy(a, 20)); spGain(); } },
+    phys:    { aim: 'main', name: '斷頭台', desc: '對主目標造成 800% 物理屬性傷害。', hits: (es, m) => [{ t: m, mult: 8.0 }] },
+    fire:    { aim: 'all', name: '焚城', desc: '對敵方全體造成 300% 火屬性傷害，並使其受到的傷害提高 20%，持續 2 回合。', hits: es => es.map(t => ({ t, mult: 3.0 })), after: ts => debuffOn(ts, '焚城', 2, { dmgTakenUp: 0.20 }) },
+    water:   { aim: 'all', name: '海嘯', desc: '對敵方全體造成 250% 水屬性傷害，我方全體回復 15% 最大生命。', hits: es => es.map(t => ({ t, mult: 2.5 })), after: (ts, u) => allies().forEach(a => heal(u, a, 0.15 * a.maxHp)) },
+    wind:    { aim: 'rand', name: '颶風眼', desc: '進行 12 次彈射，每次 70% 風屬性傷害，隨後我方全體行動提前 20%。', hits: es => Array.from({ length: 12 }, () => ({ t: rand(es), mult: 0.7 })), after: () => allies().forEach(a => advance(a, 0.20)) },
+    thunder: { aim: 'all', name: '天罰', desc: '對敵方全體造成 280% 雷屬性傷害，並使其行動延後 30%。', hits: es => es.map(t => ({ t, mult: 2.8 })), after: ts => ts.filter(e => e.alive).forEach(e => delay(e, 0.3)) },
+    ice:     { aim: 'all', name: '絕對零度', desc: '對敵方全體造成 220% 冰屬性傷害，並使其造成的傷害降低 40%，持續 2 回合。', hits: es => es.map(t => ({ t, mult: 2.2 })), after: ts => debuffOn(ts, '絕對零度', 2, { dmgDealtRed: 0.40 }) },
+    grass:   { aim: 'all', name: '萬物生', desc: '對敵方全體造成 200% 草屬性傷害，我方全體恢復 20 點能量，並恢復 1 個戰技點。', hits: es => es.map(t => ({ t, mult: 2.0 })), after: () => { allies().forEach(a => gainEnergy(a, 20)); spGain(); } },
   };
   /** 依數量（多→少）排序元素；數量相同時先投入的優先 */
   function rankElems(items) {
@@ -581,7 +587,7 @@ const Engine = (() => {
     const B = S.cashbox, e = elem || u.elem;
     if (!B || !cashOn() || n <= 0) return;
     for (let i = 0; i < n; i++) B.items.push({ e, by: u.id });
-    log('buff', `兌現匣 ← ${u.name} ${elem ? '投入' : '逸散'} ${n} 份${ELEM_NAME[e]}餘料${why ? '（' + why + '）' : ''}（${Math.min(CASH_CAP, B.items.length)}/${CASH_CAP}）`, '', { kind: 'residue', src: u.id, e, n });
+    log('buff', `兌現匣 ← ${u.name} ${elem ? '投入' : '逸散'} ${n} 份${ELEM_NAME[e]}餘料${why ? '（' + why + '）' : ''}（${Math.min(CASH_CAP, B.items.length)}/${CASH_CAP}）`, '', { kind: 'residue', src: u.id, e, n, full: B.items.length >= CASH_CAP });
     while (B.items.length >= CASH_CAP && enemies().length) cashOut(B.items.splice(0, CASH_CAP), u);
   }
   /** 兌現匣本身（攻擊者）：不在行動軸上，只在兌現時建立 */
@@ -590,7 +596,7 @@ const Engine = (() => {
     const avg = f => us.reduce((sum, u) => sum + f(u), 0) / Math.max(1, us.length);
     return { id: 'cashbox', side: 'ally', key: 'cashbox', name: '兌現匣', alive: true, buffs: [], elem: form,
       base: { lvl: Math.round(avg(u => u.base.lvl)) || 80, baseAtk: 0, atkPct: 0, atkFlat: 0, cr: 0, cd: 0, dmgBonus: 0, be: 0, sets: [], traces: {}, lc: null },
-      atk: avg(u => getAtk(u, null)), be: avg(u => getBE(u)) };
+      atk: avg(u => getAtk(u, null)) };
   }
   function cashOut(batch, by) {
     const B = S.cashbox, rank = rankElems(batch), form = rank[0].e, load = rank[1] ? rank[1].e : null, proto = !load;
@@ -602,15 +608,15 @@ const Engine = (() => {
     const mix = rank.map(r => `${ELEM_NAME[r.e]}×${r.n}`).join('、');
     const who = rankElems(batch.map(x => ({ e: x.by }))).map(r => `${U(r.e) ? U(r.e).name : '?'}×${r.n}`).join('、');
     log('info', proto ? `◆ 兌現匣【原型兌現·${F.name}】（${mix}）` : `◆ 兌現匣【兌現】形制：${ELEM_NAME[form]}·${F.name}／裝填：${ELEM_NAME[load]}·${Ld.name}（${mix}）`,
-      `投入者：${who}\n兌現匣攻擊力 ${fmt(u.atk)}、擊破特攻 ${pct(u.be)}（投入者依份數加權平均）`, { kind: 'cashout', src: 'cashbox', form, load, proto });
+      `投入者：${who}\n兌現匣攻擊力 ${fmt(u.atk)}（投入者依份數加權平均）`, { kind: 'cashout', src: 'cashbox', form, load, proto });
     const es = enemies(), m = enemyTarget();
-    const be = u.be, hits = F.hits(es, m && m.alive ? m : es[0]);
+    const hits = F.hits(es, m && m.alive ? m : es[0]);
     const label = proto ? `原型兌現·${F.name}` : `兌現·${F.name}`;
     const hitT = [], marked = [];
     hits.forEach(h => {
       if (!h.t || !h.t.alive) return;
       if (!hitT.includes(h.t)) { hitT.push(h.t); if (h.t.peek || h.t.flagrant) marked.push(h.t); }
-      dealDamage(u, h.t, { base: u.atk * h.mult * (1 + be), elem: form, label, atype: 'cashout', canCrit: false, note: `兌現匣攻擊力 ${fmt(u.atk)} × ${pct(h.mult)} × (1 + 擊破特攻 ${pct(be)})` });
+      dealDamage(u, h.t, { base: u.atk * h.mult, elem: form, label, atype: 'cashout', canCrit: false, note: `兌現匣攻擊力 ${fmt(u.atk)} × ${pct(h.mult)}` });
     });
     emit('afterAttack', { att: u, targets: hitT, marked, o: { atype: 'cashout' } });
     if (F.after) F.after(hitT, u);
@@ -877,12 +883,13 @@ const Engine = (() => {
   function setProxy(a) {
     S.proxy = a.id;
     if (!a.mark) a.mark = '兄友';
-    log('buff', `${a.name} 成為「被代理人」［${a.mark}］`);
+    const m = alive('mocha');
+    log('buff', `${a.name} 成為「被代理人」［${a.mark}］`, '', m ? { kind: 'contract', src: m.id, tgt: a.id, mark: a.mark } : undefined);
   }
   function switchMark(a) {
     const m = alive('mocha');
     a.mark = a.mark === '兄友' ? '弟恭' : '兄友';
-    log('buff', `${a.name} 的印記切換為［${a.mark}］`);
+    log('buff', `${a.name} 的印記切換為［${a.mark}］`, '', m ? { kind: 'contract', src: m.id, tgt: a.id, mark: a.mark, sw: true } : undefined);
     if (m && tr(m, 'a1')) {
       gainEnergy(m, 15);
       addBuff(a, { name: '售後服務', dur: 1, stats: { dmgTakenRed: 0.15 } });
@@ -892,12 +899,12 @@ const Engine = (() => {
   function proxyExec(m, mark) {
     const p = S.proxy ? U(S.proxy) : null;
     if (mark === '兄友') {
-      log('info', '▶ 代理執行-兄：合法催收程序');
+      log('info', '▶ 代理執行-兄：合法催收程序', '', { kind: 'proxy', src: m.id, role: 'elder', name: '合法催收程序' });
       attack(m, enemies(), 1.5, 'ice', '代理執行-兄', { tough: 10, atype: 'extra' });
       enemies().forEach(e => addBuff(e, { name: '疑點', dur: 3, stats: { defRed: 0.10, dmgDealtRed: 0.30 } }));
       log('buff', '敵方全體 獲得 疑點（防禦 −10%，造成傷害 −30%，3回合）');
     } else {
-      log('info', '▶ 代理執行-弟：公關預算浮報');
+      log('info', '▶ 代理執行-弟：公關預算浮報', '', { kind: 'proxy', src: m.id, role: 'younger', name: '公關預算浮報', tgts: allies().map(a => a.id) });
       const cap = 0.25 * getAtk(m, null, true);
       allies().forEach(a => addBuff(a, { name: '精銳', dur: 3, stats: { atkFlat: Math.min(0.40 * a.base.baseAtk, cap), cd: 0.50 } }));
       log('buff', `我方全體 獲得 精銳（攻擊力 +min(40%基礎攻擊, ${fmt(cap)})，暴傷 +50%，3回合）`);
@@ -936,10 +943,11 @@ const Engine = (() => {
   // 被代理人：攻擊力 +20%、暴擊傷害 +20%
   mod('atkPct', u => (S.proxy === u.id ? 0.20 : 0), 10);
   mod('cd', u => (S.proxy === u.id ? 0.20 : 0));
-  // 天賦：買一送一，帳單分開結 — 被代理人回合開始時，消耗 2 默契插入代理執行
-  on('turnStart', c => {
+  // 確認被代理人的普攻／戰技後才執行；選目標、預覽及插入的終結技均不消耗默契。
+  on('actionConfirm', c => {
     const p = c.u, m = alive('mocha');
-    if (S.proxy !== p.id || !m || m.tacit < 2 || !p.mark) return;
+    if (S.proxy !== p.id || !m || m.tacit < 2 || !p.mark || S.proxyActTurn === S.turnNo) return;
+    S.proxyActTurn = S.turnNo;
     m.tacit -= 2;
     const mark0 = p.mark;
     log('info', '▶ 莫卡兄弟【買一送一，帳單分開結】消耗 2 默契，插入代理執行', '', { kind: 'cast', src: m.id });
@@ -1013,6 +1021,7 @@ const Engine = (() => {
     skill(u) {
       spUse();
       const amt = 2048 * alanShieldMult(u);
+      log('info', '▶ 阿蘭 為我方全體展開護盾', '', { kind: 'barrier', src: u.id, tgts: allies().map(a => a.id) });
       allies().forEach(a => alanShield(u, a, amt));
       u.cover = Math.min(3, u.cover + 2);
       log('buff', `阿蘭 獲得 2 點掩護（${u.cover}/3）→ 隨後獲得額外回合`);
@@ -2067,7 +2076,7 @@ const Engine = (() => {
   SKILL_LOCK.otg = () => !!S.duel;   // 生死角力期間無法施放戰技
   SKILLS.otg = {
     basic(u) {
-      if (S.duel && duelFoe()) return SKILLS.otg.enhanced(u, false);
+      if (S.duel && duelFoe()) { S.target = S.duel.id; return SKILLS.otg.enhanced(u, false, duelFoe()); }   // 生死角力：普攻鎖定角力中的敵人
       const t = enemyTarget(); spGain();
       attack(u, [t], 1.0, 'phys', '普攻·惡的問題', { tough: 10, atype: 'basic' });
       applyLacer(u, t, 1.0);
@@ -2198,8 +2207,8 @@ const Engine = (() => {
   on('beforeHit', c => { if (c.att.side === 'ally' && !c.o.breakDmg && hasSet(c.att, 'auction2') && (c.o.atype === 'basic' || c.o.atype === 'skill') && getCR(c.att) >= 0.7) c.mod.dmg += 0.20; }, 30);
   on('cashout', c => {
     c.contributors.filter(a => a.alive && hasSet(a, 'scorch4')).forEach(a => {
-      addBuff(a, { name: '焦土狙擊手', dur: 2, stats: { be: 0.20 } });
-      log('buff', `妙具【焦土狙擊手】：${a.name} 投入的餘料參與兌現 → 擊破特攻 +20%（2回合）`);
+      addBuff(a, { name: '焦土狙擊手', dur: 2, stats: { atkPct: 0.15 } });
+      log('buff', `妙具【焦土狙擊手】：${a.name} 投入的餘料參與兌現 → 攻擊力 +15%（2回合）`);
     });
   }, 40);
   on('beforeAction', c => {
@@ -2580,10 +2589,23 @@ const Engine = (() => {
     if (e.type !== 'raiden' || c.killed || e.phase2 || e.hp > e.maxHp * 0.5) return;
     e.phase2 = true;
     log('wave', `━━ ${e.name} 進入二階段 ━━`, '', { kind: 'phase', src: e.id, n: 2 });
+    phaseCleanse(e);
     emit('enemyPhase', { u: e });
     e.ultNext = true; e.chase = null;
     if (!S.extraQueue.some(q => q.id === e.id)) S.extraQueue.push({ id: e.id });
   }, 60);
+  /** 轉階段：清除身上所有常規負面效果（減益狀態、裂傷、血破、悲悼、禁錮）。
+   *  角色機制的標記（管中窺豹／現行犯、樣本、記錄）與生死角力不算常規負面效果，保留。生命值不變。 */
+  function phaseCleanse(e) {
+    const bad = e.buffs.filter(isBadBuff), parts = [];
+    if (bad.length) parts.push(bad.map(b => b.name).join('、'));
+    if (e.lacer.length) parts.push(`裂傷×${e.lacer.length}`);
+    if (e.bloodBreak) parts.push(`血破×${e.bloodBreak}`);
+    if (e.mourn && e.mourn.length) parts.push(`悲悼×${e.mourn.length}`);
+    if (e.stunned) parts.push('禁錮');
+    e.buffs = e.buffs.filter(b => !isBadBuff(b)); e.lacer = []; e.bloodBreak = 0; e.mourn = []; e.stunned = false;
+    log('buff', parts.length ? `${e.name} 轉階段：清除所有負面效果（${parts.join('、')}）` : `${e.name} 轉階段：身上沒有負面效果可清除`, '', parts.length ? { kind: 'cleanse', tgt: e.id } : undefined);
+  }
   // 敵人轉階段：時間織機清空並執行任務、股市回到均衡
   on('enemyPhase', c => { loomPurge('敵人轉階段'); marketReset('敵人轉階段'); }, 10);
   // 良民守則
@@ -2607,6 +2629,27 @@ const Engine = (() => {
   }, 15);
 
   /* ---------- 回合流程 ---------- */
+  /** 序列化的接續點：不先計算尚未施放的技能，存讀檔與撤銷可回到同一空檔。 */
+  function pauseTurn(stage, u) {
+    if (!interrupts || !turnWindows || previewing) return false;
+    S.turnWindow = { stage, id: u ? u.id : null };
+    S.phase = 'between';
+    return true;
+  }
+  function finishTurn(u) {
+    endTurn(u);
+    pauseTurn('after', u);
+  }
+  function enemyTurnAction(u) {
+    if (!u || !u.alive) { S.current = null; return; }
+    if (S.rules.enemyAttack) enemyAct(u);
+    else log('info', `${u.name} 沒有行動（木樁模式）`);
+    if (checkEnd()) return;
+    emit('enemyAction', { u });
+    resolveFollowUps();
+    if (checkEnd()) return;
+    finishTurn(u);
+  }
   function startTurn(u, extra) {
     S.turnNo += 1;
     S.current = u.id;
@@ -2619,24 +2662,18 @@ const Engine = (() => {
       if (checkEnd()) return;
       if (!u.alive) { S.current = null; return; }
       if (u.broken) { u.broken = false; u.tough = u.maxTough; log('buff', `${u.name} 韌性恢復`); }
-      if (S.rules.enemyAttack) enemyAct(u);
-      else log('info', `${u.name} 沒有行動（木樁模式）`);
-      if (checkEnd()) return;
-      emit('enemyAction', { u });
-      resolveFollowUps();
-      if (checkEnd()) return;
-      endTurn(u);
+      if (!pauseTurn('enemy', u)) enemyTurnAction(u);
     } else {
       if (u.stunned) {
         u.stunned = false;
         log('info', `${u.name} 處於禁錮狀態，跳過回合`);
-        endTurn(u);
+        finishTurn(u);
         return;
       }
       emit('turnStart', { u, extra });
       if (checkEnd()) return;
       if (!u.alive) { S.current = null; return; }   // 回合開始時被自身的持續傷害擊倒（O.T.G.）
-      S.phase = 'input';
+      if (!pauseTurn('input', u)) S.phase = 'input';
     }
   }
 
@@ -2681,6 +2718,21 @@ const Engine = (() => {
     }
   }
   let interrupts = false;
+  let turnWindows = false;   // 互動介面啟用三個窗口；舊呼叫端仍可只在敵方回合之間停下。
+
+  function proceed() {
+    if (!S || S.phase !== 'between') return;
+    const window = S.turnWindow;
+    S.turnWindow = null;
+    S.phase = 'running';
+    if (window && window.stage === 'enemy') enemyTurnAction(U(window.id));
+    else if (window && window.stage === 'input') {
+      const u = U(window.id);
+      if (u && u.alive) S.phase = 'input';
+      else S.current = null;
+    }
+    if (S.phase === 'running') runUntilInput();
+  }
 
   /* ---------- 建立戰鬥 / 波次 ---------- */
   function parseWeak(s) {
@@ -2716,7 +2768,7 @@ const Engine = (() => {
     S = {
       rules: JSON.parse(JSON.stringify(cfg.rules)),
       units: [], sp: 3, spMax: 5, time: 0, extraQueue: [], followQueue: [], phase: 'running',
-      current: null, currentExtra: false, turnNo: 0, log: [], stats: {},
+      current: null, currentExtra: false, turnNo: 0, turnWindow: null, log: [], stats: {},
       proxy: null, target: null, allyTarget: null, a2Turn: -1, waves, wave: 0, escort: null, model: null, duel: null,
     };
     const seen = new Set();
@@ -2761,6 +2813,15 @@ const Engine = (() => {
     if (S.phase !== 'input' || !u) return false;
     if (kind === 'skill' && !canSkillFor(u)) return false;
     S.phase = 'running';
+    const wave = S.wave;
+    emit('actionConfirm', { u, kind });
+    resolveFollowUps();
+    if (checkEnd()) return true;
+    if (S.wave !== wave) {   // 代理先清場：不消耗原技能，留在本回合重新選擇新波次目標。
+      S.phase = 'input';
+      return true;
+    }
+    if (!u.alive) { S.current = null; if (!previewing) runUntilInput(); return true; }
     const enh = (u.key === 'kane' && kaneEnhanced()) || (u.key === 'alan' && u.cover > 0) || (u.key === 'otg' && !!S.duel);
     const name = kind === 'skill' ? '戰技·' + CHARS[u.key].actions.skill
       : (enh ? '強化普攻·' + CHARS[u.key].actions.enhanced : '普攻·' + CHARS[u.key].actions.basic);
@@ -2770,8 +2831,8 @@ const Engine = (() => {
     emit('afterAction', { u, kind });
     resolveFollowUps();
     if (checkEnd()) return true;
-    endTurn(u);
-    if (!previewing) runUntilInput();
+    finishTurn(u);
+    if (!previewing && S.phase === 'running') runUntilInput();
     return true;
   }
   function doUlt(id) {
@@ -3028,8 +3089,9 @@ const Engine = (() => {
     marketFx: () => (S ? marketFx() : null),
     ult(id) { if (!S || (S.phase !== 'input' && S.phase !== 'between')) return false; pushHistory(); if (!doUlt(id)) { history.pop(); return false; } return true; },
     /** 空檔結束，繼續推進到下一個空檔或我方回合 */
-    proceed() { if (S && S.phase === 'between') runUntilInput(); },
+    proceed,
     setInterrupts(v) { interrupts = !!v; },
+    setTurnWindows(v) { turnWindows = !!v; },
     canUlt(id) { const u = S && U(id); return !!u && u.alive && u.side === 'ally' && u.energy >= u.maxEnergy - 1e-9; },
     undo() { if (history.length) { S = JSON.parse(history.pop()); if (!S.followQueue) S.followQueue = []; events = []; } },
     /** 存檔用：匯出目前戰鬥（戰鬥紀錄只保留最後 600 筆，不含撤銷歷史） */
@@ -3055,6 +3117,7 @@ const Engine = (() => {
       if (!('cashbox' in S)) S.cashbox = null;    // 舊版存檔沒有兌現匣
       if (!('flow' in S)) S.flow = null;          // 舊版存檔沒有星流
       if (!('duel' in S)) S.duel = null;
+      if (!('turnWindow' in S)) S.turnWindow = null;
       ensureFlowTimer();
       syncSpeeds();
       S.units.forEach(u => { if (u.side === 'enemy' && !u.mourn) u.mourn = []; if (!u.lacer && u.side === 'ally') u.lacer = []; });

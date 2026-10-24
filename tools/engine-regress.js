@@ -53,6 +53,7 @@ function scenarios() {
 function run(sc) {
   const E = makeEngine(sc.seed);
   E.setInterrupts(sc.interrupts);
+  E.setTurnWindows(process.env.TURN_WINDOWS === '1');
   E.newBattle(sc.cfg);
   let steps = 0, ultToggle = 0;
   for (; steps < 20000; steps++) {

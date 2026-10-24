@@ -21,10 +21,10 @@ function battle() {
   a.av = 0; e.av = 10000;
   return { E, ctx, S, a, e };
 }
-async function artFixture(phase2 = true) {
+async function artFixture(phase2 = true, alternate = false) {
   const pending = []; let next = 0;
   const ctx = vm.createContext({ console, Math, Promise,
-    ART_IMAGES: { '自律處刑官・「雷霆-09型」': 'phase-one', ...(phase2 ? { '自律處刑官・「雷霆-09型」-第二階段': 'phase-two' } : {}) },
+    ART_IMAGES: { '自律處刑官・「雷霆-09型」': 'phase-one', ...(phase2 ? { '自律處刑官・「雷霆-09型」-第二階段': 'phase-two' } : {}), ...(alternate ? { '自律處刑官・「雷霆-09型」-異相凱恩': 'alternate-kane' } : {}) },
     Image: class { constructor() { this.naturalWidth = 32; this.naturalHeight = 48; } set src(v) { this.value = v; this.onload(); } },
     setTimeout: fn => { pending.push(fn); }, URL: { createObjectURL: () => 'blob:fixture-' + ++next },
     document: { createElement: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {}, getImageData: (x,y,w,h) => ({ data: new Uint8ClampedArray(w*h*4) }) }), toBlob: fn => fn({}) }) },
@@ -61,6 +61,46 @@ async function main() {
   test('A missing phase-two file safely uses the first-phase portrait', () => {
     assert.equal(fallback.enemyKey({ type: 'raiden', phase2: true }), 'raiden');
     assert.equal(fallback.enemy({ type: 'raiden', phase2: true }).canvas, fallback.get('raiden').canvas);
+  });
+  const alternateArt = await artFixture(true, true);
+  test('Alternate Kane covers both boss phases, body portraits and string callers; standard mode restores both originals', () => {
+    alternateArt.setRaidenSkin('kane');
+    for (const u of ['raiden', { type:'raiden',phase2:false }, { type:'raiden',phase2:true }]) {
+      assert.equal(alternateArt.enemyKey(u),'raiden_kane');
+      assert.equal(alternateArt.enemy(u).canvas,alternateArt.get('raiden_kane').canvas);
+    }
+    assert.equal(alternateArt.enemyKey('thug'),'thug');
+    assert.equal(alternateArt.enemyKey({type:'boss'}),'boss');
+    alternateArt.setRaidenSkin('raiden');
+    assert.equal(alternateArt.enemyKey({type:'raiden',phase2:false}),'raiden');
+    assert.equal(alternateArt.enemyKey({type:'raiden',phase2:true}),'raiden_phase2');
+    alternateArt.setRaidenSkin('unknown');
+    assert.equal(alternateArt.enemyKey('raiden'),'raiden');
+  });
+  test('Missing alternate art falls back to the appropriate original phase', () => {
+    Art.setRaidenSkin('kane');
+    assert.equal(Art.enemyKey({type:'raiden',phase2:false}),'raiden');
+    assert.equal(Art.enemyKey({type:'raiden',phase2:true}),'raiden_phase2');
+    Art.setRaidenSkin('raiden');
+  });
+  test('Old saves default to original appearance; valid skin survives config round trips, invalid values normalize', () => {
+    const b=battle(),run=ui(b,alternateArt),before=JSON.stringify(b.E.state());
+    assert.equal(run('mergeCfg({ui:{speed:2}}).ui.raidenSkin'),'raiden');
+    assert.equal(run('mergeCfg({ui:{raidenSkin:"invalid"}}).ui.raidenSkin'),'raiden');
+    assert.equal(run('mergeCfg(JSON.parse(JSON.stringify(mergeCfg({ui:{raidenSkin:"kane"}})))).ui.raidenSkin'),'kane');
+    run('CFG.ui.raidenSkin="kane";syncRaidenSkin();');
+    assert.equal(alternateArt.enemyKey(b.e),'raiden_kane');
+    assert.match(run('enemySvg(Engine.state().units.find(u=>u.type==="raiden"))'),/data-art="raiden_kane"/);
+    assert.match(run('enemySvg(Engine.state().units.find(u=>u.type==="raiden"),"32 0 56 56")'),/data-art="raiden_kane"/);
+    assert.equal(JSON.stringify(b.E.state()),before);
+    for(const phase2 of [false,true]) {
+      const snap=plain(b.S);snap.units.find(u=>u.id===b.e.id).phase2=phase2;
+      b.ctx.cast={fx:{key:'raiden',src:b.e.id},snap};run('playEnemyUlt(cast)');
+      assert.equal(b.ctx.shortOptions.artKey,'raiden_kane');
+    }
+    run('CFG.ui.raidenSkin="raiden";syncRaidenSkin();');
+    assert.equal(alternateArt.enemyKey(b.e),'raiden');
+    assert.equal(JSON.stringify(b.E.state()),before);
   });
   let transition;
   test('A real hit crosses 50%, emits one phase event, and preserves pre-transition snapshots', () => {

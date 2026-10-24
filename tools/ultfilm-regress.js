@@ -71,7 +71,7 @@ function harness({ art = true, width = 1600, height = 900 } = {}) {
 }
 const enemies = n => Array.from({ length: n }, (_, i) => ({ type: i % 2 ? 'boss' : 'thug', name: '目標 ' + i, main: i === 0 }));
 for (const key of ['mark', 'miller', 'otg']) {
-  const duration = { mark: 12000, miller: 12500, otg: 12800 }[key];
+  const duration = { mark: 13000, miller: 12500, otg: 12800 }[key];
   for (const art of [true, false]) for (const n of [0, 1, 3, 5]) {
     test(`${key}: all scenes, ${n} targets, artwork ${art ? 'present' : 'missing'}`, () => {
       const h = harness({ art });
