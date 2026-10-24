@@ -1556,7 +1556,7 @@ const UltFx = (() => {
       const ap = eo(prog(t, 60, 600)), aout = eio(prog(t, 1450, 1750));
       const ax = lerp(vw * 1.1, vw * 0.72, ap) + aout * vw * 0.3;
       drawArt(c, s.A, ax, vh * 0.2, ap * (1 - aout) * out);
-      if (s.A) glowDot(c, ax, vh * 0.2, vh * 0.08, 'rgba(255,220,90,.9)', ap * (1 - aout) * out * (0.6 + 0.4 * Math.sin(t * 0.02)));
+      if (s.A && s.artKey !== 'raiden_kane') glowDot(c, ax, vh * 0.2, vh * 0.08, 'rgba(255,220,90,.9)', ap * (1 - aout) * out * (0.6 + 0.4 * Math.sin(t * 0.02)));
       // 標題（左）
       const ta = (1 - prog(t, 1350, 1600)) * out;
       if (ta > 0) {

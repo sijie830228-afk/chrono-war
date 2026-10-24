@@ -19,7 +19,7 @@ const Meta = (() => {
     kane:     { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 28 }, { stat: 'cr', v: 12 }, { stat: 'hpPct', v: 10 }] },
     longzhao: { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 28 }, { stat: 'ehr', v: 18 }, { stat: 'spd', v: 5 }] },
     mocha:    { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'hpPct', v: 18 }, { stat: 'spd', v: 9 }, { stat: 'effRes', v: 10 }] },
-    alan:     { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'be', v: 37.3 }, { stat: 'defPct', v: 22.5 }, { stat: 'atkPct', v: 10 }] },
+    alan:     { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 28 }, { stat: 'defPct', v: 22.5 }, { stat: 'hpPct', v: 10 }] },
     gordon:   { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 18 }, { stat: 'spd', v: 9 }, { stat: 'cr', v: 6.7 }] },
     alexandra: { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 18 }, { stat: 'spd', v: 9 }, { stat: 'hpPct', v: 10 }] },
     mark:     { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 18 }, { stat: 'cr', v: 9.3 }, { stat: 'err', v: 8 }] },
@@ -107,6 +107,7 @@ const Meta = (() => {
     if (!S.createdAt) S.createdAt = Date.now();
     migrateNewChars();
     S.inv.forEach(it => { if (it.main === 'imagDmg') it.main = 'luckDmg'; });   // 戈登改為運屬性：舊的虛數增傷位面球一併轉換
+    S.inv.forEach(it => Relics.migrateItem(it));   // 擊破特攻已失效：舊妙具的擊破特攻詞條改為攻擊力%
   }
   /** 新角色加入時，舊存檔自動取得該角色與其預設妙具、經緯 */
   function migrateNewChars() {

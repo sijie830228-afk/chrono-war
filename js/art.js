@@ -8,27 +8,28 @@
 const Art = (() => {
   // 莫卡兄弟有兩種素材：一張雙人圖（莫卡兄弟），或兄、弟分開的兩張圖。
   // 分開時兩人各自可用（mocha_elder / mocha_younger，短片裡使用），另外合成一張雙人圖給角色卡等地方當 mocha 使用。
-  const FILE = { longzhao: '龍爪', kane: '凱恩', mocha: '莫卡兄弟', mocha_elder: '莫卡兄弟-兄', mocha_younger: '莫卡兄弟-弟', alan: '阿蘭', gordon: '戈登', alexandra: '亞力山卓', alexandra_car: '亞力山卓與警車', police_car: '警車', otg: 'O.T.G.', raiden: '自律處刑官・「雷霆-09型」', raiden_phase2: '自律處刑官・「雷霆-09型」-第二階段', hanye: '寒夜', mark: '馬克', miller: '米勒' };
+  const FILE = { longzhao: '龍爪', kane: '凱恩', mocha: '莫卡兄弟', mocha_elder: '莫卡兄弟-兄-代理執行', mocha_younger: '莫卡兄弟-弟-代理執行', alan: '阿蘭', gordon: '戈登', alexandra: '亞力山卓', alexandra_car: '亞力山卓與警車', police_car: '警車', otg: 'O.T.G.', raiden: '自律處刑官・「雷霆-09型」', raiden_phase2: '自律處刑官・「雷霆-09型」-第二階段', raiden_kane: '自律處刑官・「雷霆-09型」-異相凱恩', hanye: '寒夜', mark: '馬克', miller: '米勒' };
   // face = 臉部中心、bust = 上半身中心：大於 1 的數字是原圖像素座標，小於等於 1 是比例
   // bg：'white' 白底（預設）、'smooth' 平滑漸層的深色背景（以顏色連續性判斷背景）、
   //     'fade' 邊緣淡出、'whiteFade' 先去白邊再淡出、'alpha' 原圖已是透明背景（不處理）
   const FOCUS = {
     kane:          { face: [0.50, 0.115], bust: [0.50, 0.28], bg: 'alpha' },      // 永滅故事集、證物與交錯紅線
-    mocha:         { face: [372, 290], bust: [380, 380] },
-    mocha_elder:   { face: [0.575, 0.2], bust: [0.55, 0.4], bg: 'alpha' },
-    mocha_younger: { face: [0.49, 0.105], bust: [0.5, 0.27], bg: 'alpha' },       // 透明背景（換新圖）
-    alan:          { face: [0.46, 0.09], bust: [0.47, 0.23], bg: 'alpha' },       // 透明背景（換新圖）
-    longzhao:      { face: [0.44, 0.1], bust: [0.45, 0.26], bg: 'alpha' },        // 透明背景（換新圖）
-    gordon:        { face: [0.43, 0.075], bust: [0.47, 0.21], bg: 'alpha' },      // 透明背景（換新圖，坐在沙發上）
-    alexandra:     { face: [0.53, 0.098], bust: [0.53, 0.25], bg: 'alpha' },     // 透明背景的全身立繪（手持墨鏡）
-    alexandra_car: { face: [0.67, 0.15], bust: [0.64, 0.3], bg: 'alpha' },      // 倚著警車的版本（終結技演出用）
+    mocha: { face: [0.53, 0.15], bust: [0.53, 0.38], faces: [[0.425,0.22],[0.635,0.09]], bg: 'alpha' },      // 已確認的多視角立繪
+    mocha_elder:   { face: [0.55, 0.145], bust: [0.53, 0.34], bg: 'alpha' },
+    mocha_younger: { face: [0.50, 0.115], bust: [0.51, 0.31], bg: 'alpha' },       // 透明背景（換新圖）
+    alan: { face: [0.39, 0.28], bust: [0.40, 0.43], bg: 'alpha' },      // 已確認的多視角立繪
+    longzhao: { face: [0.62, 0.155], bust: [0.59, 0.34], bg: 'alpha' },      // 已確認的多視角立繪
+    gordon: { face: [0.445, 0.21], bust: [0.47, 0.39], bg: 'alpha' },      // 已確認的多視角立繪
+    alexandra: { face: [0.53, 0.12], bust: [0.53, 0.30], bg: 'alpha' },      // 已確認的多視角立繪
+    alexandra_car: { face: [0.53, 0.12], bust: [0.53, 0.30], bg: 'alpha' },      // 已確認的多視角立繪
     police_car:    { face: [0.5, 0.45], bust: [0.5, 0.5], bg: 'alpha' },        // 警車本身（秘技、終結技演出用）
     raiden:        { face: [0.53, 0.075], bust: [0.5, 0.28], bg: 'alpha' },     // 首領：自律處刑官・「雷霆-09型」（透明背景，敵人卡與演出用）
+    raiden_kane:   { face: [0.50, 0.105], bust: [0.50, 0.29], bg: 'alpha' },    // 彩蛋：異相凱恩，兩階段沿用此造型
     raiden_phase2: { face: [0.53, 0.075], bust: [0.55, 0.25], bg: 'alpha' },     // 第二階段：盾甲展開、電容核心外露
-    otg:           { face: [0.43, 0.085], bust: [0.45, 0.25], bg: 'alpha' },      // 透明背景（換新圖）
-    hanye:         { face: [0.47, 0.055], bust: [0.47, 0.24], bg: 'alpha' },     // 透明背景的全身立繪（白色長袍不能用白底去背）
-    mark:          { face: [0.485, 0.135], bust: [0.48, 0.3], bg: 'alpha' },   // 透明背景的全身立繪
-    miller:        { face: [0.53, 0.168], bust: [0.52, 0.3], bg: 'alpha' },   // 透明背景的全身立繪（撐黑傘）
+    otg: { face: [0.51, 0.22], bust: [0.51, 0.43], bg: 'alpha' },      // 已確認的多視角立繪
+    hanye: { face: [0.65, 0.17], bust: [0.60, 0.34], bg: 'alpha' },      // 已確認的多視角立繪
+    mark: { face: [0.66, 0.30], bust: [0.58, 0.48], bg: 'alpha' },      // 已確認的多視角立繪
+    miller: { face: [0.32, 0.19], bust: [0.47, 0.38], bg: 'alpha' },      // 已確認的多視角立繪
   };
   const data = {};
   const waiting = [];
@@ -165,7 +166,21 @@ const Art = (() => {
           face: [facePx[0] / W, facePx[1] / H], bust: [bustPx[0] / W, bustPx[1] / H],
           facePx, url: null, canvas: cut };   // canvas：終結技演出直接繪製用
         info.top = figureTop(cut, info.face[0], info.face[1]);
-        cut.toBlob(b => { info.url = b ? URL.createObjectURL(b) : info.raw; data[k] = info; if (--pending === 0) finish(); done(); }, 'image/png');
+        const ready = () => { data[k] = info; if (--pending === 0) finish(); done(); };
+        cut.toBlob(b => {
+          info.url = b ? URL.createObjectURL(b) : info.raw;
+          if (!f.faces) return ready();
+          // 新雙人原圖也建立雙臉頭像，避免行動條／終結技按鈕只裁到其中一人。
+          const portrait = document.createElement('canvas'); portrait.width = portrait.height = 512;
+          const g = portrait.getContext('2d'), scale = 180 / (H * .14);
+          f.faces.forEach(([x,y], i) => {
+            g.save(); g.beginPath(); g.rect(i * 256, 0, 256, 512); g.clip();
+            g.drawImage(cut, i * 256 + 128 - x * W * scale, 180 - y * H * scale, W * scale, H * scale);
+            g.restore();
+          });
+          info.duo = true; info.faceCanvas = portrait;
+          portrait.toBlob(b => { info.faceUrl = b ? URL.createObjectURL(b) : portrait.toDataURL('image/png'); ready(); }, 'image/png');
+        }, 'image/png');
       }, n * 60);
       img.onerror = () => { if (--pending === 0) finish(); done(); };
       img.src = ART_IMAGES[FILE[k]];
@@ -283,17 +298,20 @@ const Art = (() => {
 
   // Use the unit's displayed snapshot, never the engine's already-resolved state.
   // Missing phase artwork falls back to the base form while assets are loading.
+  let raidenSkin = 'raiden';
   function enemyKey(unit) {
     const type = typeof unit === 'string' ? unit : unit && unit.type;
+    if (type === 'raiden' && raidenSkin === 'kane' && data.raiden_kane) return 'raiden_kane';
     return type === 'raiden' && unit.phase2 && data.raiden_phase2 ? 'raiden_phase2' : type;
   }
   return {
     get: k => data[k] || null,
     enemyKey,
+    setRaidenSkin(value) { raidenSkin = value === 'kane' ? 'kane' : 'raiden'; },
     /** 專屬首領立繪依階段選擇，其餘保留依類型上色的剪影。 */
     enemy(unit) {
       const key = enemyKey(unit), portrait = data[key];
-      return portrait ? Object.assign({ light: key === 'raiden_phase2' ? [110, 200, 255] : [255, 210, 80] }, portrait)
+      return portrait ? Object.assign({ light: key === 'raiden_kane' ? [190, 65, 90] : key === 'raiden_phase2' ? [110, 200, 255] : [255, 210, 80] }, portrait)
         : enemy[typeof unit === 'string' ? unit : unit && unit.type] || null;
     },
     /** CSS：以敵人臉部為中心的背景（行動軸、波次小頭像用），底下墊一層該類型的發光色 */

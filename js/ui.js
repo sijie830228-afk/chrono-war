@@ -114,6 +114,7 @@ function mergeCfg(s) {
     Object.assign(d.rules, s.rules || {});
     Object.assign(d.ui, s.ui || {});
   }
+  d.ui.raidenSkin = d.ui.raidenSkin === 'kane' ? 'kane' : 'raiden';
   return d;
 }
 function saveCfg() { if (typeof SaveSys !== 'undefined') SaveSys.touch(); }
@@ -188,7 +189,7 @@ function groupSubs(evs) {
  */
 function pump() {
   const S = Engine.state();
-  if (!S || view !== 'battle' || paused) return false;
+  if (!S || view !== 'battle' || paused || playing) return false;
   if (S.phase === 'input' || S.phase === 'between') {
     ultQueue = ultQueue.filter(id => Engine.canUlt(id));
     if (ultQueue.length) {
@@ -198,7 +199,7 @@ function pump() {
       return true;
     }
   }
-  if (S.phase === 'between') { run(() => Engine.proceed()); return true; }
+  if (S.phase === 'between' && !armed) { run(() => Engine.proceed()); return true; }
   return false;
 }
 function playNext() {
@@ -211,7 +212,7 @@ function playNext() {
   }
   playing = true;
   const ev = queue.shift();
-  if (ev.fx && ev.fx.kind === 'dmg' && ev.fx.grp && ev.fx.line) {   // 擴散／群體攻擊：一次播出角色自己的範圍特效
+    if (ev.fx && ev.fx.kind === 'dmg' && ev.fx.line && (ev.fx.grp || isKaneNetHit(ev))) {   // 群攻與單目標收網共用命中時間軸
     const d = playArea(ev);
     if (d) { playTimer = setTimeout(playNext, d); return; }
   }
@@ -228,12 +229,13 @@ function playNext() {
   shownLog = Math.max(shownLog, ev.idx + 1, ...(ev.subs || []).map(x => x.idx + 1));
   let hold = (DELAY[ev.entry.type] || 300) / CFG.ui.speed;
   if (ev.fx && ev.fx.kind === 'dot') dotChain = true;
-  else if (['turn', 'act', 'ult', 'wave', 'kill'].includes(ev.entry.type) || ev.fx && ['follow', 'dmg', 'drift', 'cashout', 'loomRun'].includes(ev.fx.kind)) dotChain = false;
+  else if (['turn', 'act', 'ult', 'wave', 'kill'].includes(ev.entry.type) || ev.fx && ['follow', 'proxy', 'dmg', 'drift', 'cashout', 'loomRun'].includes(ev.fx.kind)) dotChain = false;
   if (dotChain && ['info', 'buff'].includes(ev.entry.type) && !ev.fx) hold = 45 / CFG.ui.speed;
   if (ev.fx && ev.fx.fast) hold *= 0.32;                                            // 寒夜的連續彈射
   else if (ev.fx && ev.fx.kind === 'riemann') hold = (ev.fx.n >= 12 ? 1100 : 800) / CFG.ui.speed;
   else if (ev.fx && ev.fx.kind === 'cashout') hold = 1000 / CFG.ui.speed;
   else if (ev.fx && ev.fx.kind === 'residue' && ev.fx.full) hold = Math.max(hold, (560 + 120 * Math.max(0, ev.fx.n - 1) + 60) * FXK());   // 光點全部落進彈匣後才兌現
+  else if (ev.fx && ev.fx.kind === 'proxy') hold = 1050 * FXK();
   else if (ev.fx && ev.fx.kind === 'follow') hold = (ev.fx.visual === 'policeDrift' ? 1150 : 650) / CFG.ui.speed;
   else if (ev.fx && ev.fx.kind === 'drift') hold = 1150 / CFG.ui.speed;
   else if (ev.fx && ev.fx.kind === 'phase') hold = 1300 / CFG.ui.speed;
@@ -269,7 +271,7 @@ function driftHits(src) {
   let last = -1;
   for (let i = 0; i < queue.length; i++) {
     const q = queue[i], f = q.fx;
-    if (['turn', 'act', 'ult', 'wave'].includes(q.entry.type) || f && ['follow', 'cashout', 'loomRun', 'drift'].includes(f.kind)) break;
+    if (['turn', 'act', 'ult', 'wave'].includes(q.entry.type) || f && ['follow', 'proxy', 'cashout', 'loomRun', 'drift'].includes(f.kind)) break;
     if (f && f.src === src && f.kind === 'dmg' && !f.sub) last = i;
   }
   if (last < 0) return null;
@@ -294,19 +296,24 @@ function driftHits(src) {
 /* ---------- 擴散與群體攻擊 ----------
  * 同一次動作的多筆命中（引擎標上同一個 grp）一起從佇列取出：先播一次角色自己的範圍特效，
  * 各目標的傷害數字、受擊與紀錄在特效打到該目標的瞬間依序呈現（結算本身早已完成，只是呈現時機）。 */
+function isKaneNetHit(ev) {
+  const f = ev.fx, units = ev.snap && ev.snap.units || viewState().units;
+  return !!(f && f.kind === 'dmg' && f.line && ev.entry && ev.entry.text.includes('強化普攻·收網')
+    && units.some(u => u.id === f.src && u.key === 'kane'));
+}
 function playArea(ev) {
-  const g = ev.fx.grp, s = cardEl(ev.fx.src);
+  const g = ev.fx.grp, s = cardEl(ev.fx.src), net = isKaneNetHit(ev);
   if (!s) return 0;
   let last = -1;
-  for (let i = 0; i < queue.length; i++) {
+  for (let i = 0; g != null && i < queue.length; i++) {
     const q = queue[i], f = q.fx;
-    if (['turn', 'act', 'ult', 'wave'].includes(q.entry.type) || f && ['follow', 'cashout', 'loomRun', 'drift', 'ult', 'eult'].includes(f.kind)) break;
+    if (['turn', 'act', 'ult', 'wave'].includes(q.entry.type) || f && ['follow', 'proxy', 'cashout', 'loomRun', 'drift', 'ult', 'eult'].includes(f.kind)) break;
     if (f && f.grp === g) last = i;
   }
   const pending = [ev].concat(queue.splice(0, last + 1));
   const hits = pending.filter(x => x.fx && x.fx.grp === g && x.fx.kind === 'dmg');
   const tg = [...new Set(hits.map(x => x.fx.tgt))].map(id => ({ id, el: cardEl(id), main: hits.some(x => x.fx.tgt === id && x.fx.main) })).filter(x => x.el);
-  if (tg.length < 2) { queue.unshift(...pending.slice(1)); return 0; }
+  if (!tg.length || tg.length < 2 && !net) { queue.unshift(...pending.slice(1)); return 0; }
   tg.forEach(x => { const c = center(x.el); x.hp = { x: c.x, y: c.r.top + c.r.height * 0.55 }; });
   tg.sort((a, b) => a.hp.x - b.hp.x);
   const W = viewState(), src = (W.units || []).find(u => u.id === ev.fx.src);
@@ -320,7 +327,14 @@ function playArea(ev) {
     if (f && f.grp === g && f.kind === 'dmg' && at[f.tgt] != null) tPrev = Math.max(tPrev, at[f.tgt]);
     impactLater(() => presentArea(x, g), tPrev);
   });
-  return tPrev + 430 / CFG.ui.speed;
+  if (net) {
+    // Run after every same-frame snapshot has been rendered, so all targets retain the recoil.
+    impactLater(() => {
+      tg.forEach(x => { const t = cardEl(x.id); if (t) { t.style.setProperty('--net-k', FXK()); addCls(t, 'net-caught'); } });
+      shakeField(true);
+    }, tPrev);
+  }
+  return net ? Math.max(tPrev + 430 / CFG.ui.speed, 1040 * FXK()) : tPrev + 430 / CFG.ui.speed;
 }
 function presentArea(ev, g) {
   appendLog(ev.entry, ev.subs && ev.subs.map(x => x.entry));
@@ -359,15 +373,8 @@ function areaFx(key, f, s, tg, area) {
   const sweep = (t0, dur) => tg.forEach(x => set(x, t0 + dur * (x.hp.x - L.x) / Math.max(1, R.x - L.x)));   // 由左到右掃過
   const col = ELEM_COLOR[f.elem] || '#fff';
   switch (area === 'blast' ? key + ':blast' : key) {
-    case 'kane': {        // 收網：每個目標釘上證物圖釘，紅線連成一張網，最後一起收緊
-      tg.forEach((x, i) => later(() => fxDiv('netpin', x.hp.x, x.hp.y - 34, `animation-duration:${0.9 * k}s`, 900), i * 70));
-      for (let i = 0; i < tg.length - 1; i++) {
-        fxLine({ x: tg[i].hp.x, y: tg[i].hp.y - 34 }, { x: tg[i + 1].hp.x, y: tg[i + 1].hp.y - 34 }, '#ff3b4a', 120 + i * 70, 0.7, 'thread');
-        fxLine({ x: tg[i].hp.x, y: tg[i].hp.y + 20 }, { x: tg[i + 1].hp.x, y: tg[i + 1].hp.y - 34 }, '#c8202e', 170 + i * 70, 0.7, 'thread');
-      }
-      const close = 200 + tg.length * 70;
-      tg.forEach(x => { slash(x.hp, -32, '#ffffff', close, 150, 4); slash(x.hp, 32, '#cfe0ff', close + 40, 140, 3); later(() => sparks(x.hp, '#ff8a92', 8, 50), close + 60); set(x, close + 60); });
-      later(() => burst(C, 'netflash', '#ff3b4a', 0.4), close);
+    case 'kane': {
+      Object.assign(at, kaneNetFx(tg));
       break;
     }
     case 'longzhao': {    // 三道巨爪橫掃整排，血花依序濺開
@@ -463,6 +470,91 @@ function areaFx(key, f, s, tg, area) {
   }
   return at;
 }
+/** 收網：先以證物與鬆弛紅線包圍每個目標，再在 620ms 同時拉向各自的命中點。 */
+function kaneNetFx(tg) {
+  const k = FXK(), hit = 620 * k, at = {}, ns = 'http://www.w3.org/2000/svg';
+  const el = document.createElementNS(ns, 'svg');
+  el.setAttribute('class', 'kane-net'); el.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
+  el.setAttribute('aria-hidden', 'true'); el.style.setProperty('--net-k', k);
+  const nodes = [[-70,-88],[-14,-102],[69,-63],[72,57],[17,87],[-67,58]];
+  const links = tg.map(x => `${x.hp.x - 70},${x.hp.y - 88}`).join(' ');
+  el.innerHTML = `<g class="knet-links"><polyline points="${links}"/></g>` + tg.map((x, i) => {
+    at[x.id] = hit;
+    return `<g transform="translate(${x.hp.x} ${x.hp.y})">
+      <g class="knet-web">
+        <g class="knet-loose">${nodes.map(([px,py],j)=>`<path class="knet-thread" d="M${px} ${py}Q${px*.25+(j%2?22:-22)} ${py*.5} 0 0"/>`).join('')}</g>
+        <g class="knet-taut">${nodes.map(([px,py])=>`<path class="knet-thread" d="M${px} ${py} 0 0"/>`).join('')}</g>
+        <path class="knet-cross" d="M-70-88 69-63-67 58-14-102 72 57 17 87-70-88"/>
+        <g transform="translate(-70 -65) scale(.30)">${CastFx.evidence(0,0,i+1,i%2?8:-11)}</g>
+        ${nodes.slice(1).map(([px,py])=>`<circle class="knet-pin" cx="${px}" cy="${py}" r="2.8"/>`).join('')}
+      </g>
+      <g class="knet-snap">
+        <path class="knet-cinch" d="M-87 31-11 3 83-28M-54-48-4-4 61 43M-17-77-2-9 16 72"/>
+        <g transform="rotate(-9)" class="knet-stamp"><path d="M-49-24H49V24H-49ZM-44-19H44V19H-44Z"/><text x="0" y="9">收 網</text></g>
+        <path class="knet-ink" d="M-60-16l-4-2m115 41 5 2M-31 33l-2 4M39-35l2-4M-56 12h-4M55-8l5-2"/>
+      </g>
+    </g>`;
+  }).join('');
+  $('#fx').appendChild(el);
+  Sound.play('netPin');
+  impactLater(() => Sound.play('netPull'), 330 * k);
+  impactLater(() => Sound.play('netSnap'), hit);
+  impactLater(() => el.remove(), 1020 * k);
+  return at;
+}
+/* ---------- 對我方施放的技能 ----------
+ * 道具從施放者的角色卡以弧線飛到目標（契約、筆記頁、迷你警車、預算單據），落下時在目標身上留下各自的痕跡。 */
+/** 讓一個道具從 a 飛到 b；o = { lift, spin, dur, delay, ease, face }；onLand(b 的中心) */
+function flyProp(from, to, cls, html, o, onLand) {
+  if (!from || !to) { if (to && onLand) onLand(center(to)); return; }
+  const a = center(from), b = center(to), k = FXK(), epoch = playbackEpoch;
+  const pb = { x: b.x, y: b.r.top + b.r.height * 0.42 };
+  if (from === to) { if (onLand) later(() => onLand(pb), 60); return; }
+  const lift = o.lift == null ? 90 : o.lift, cx = (a.x + pb.x) / 2, cy = Math.min(a.y, pb.y) - lift;
+  const d = document.createElement('div');
+  d.className = 'prop ' + cls; d.innerHTML = html || '';
+  $('#fx').appendChild(d);
+  const kf = Array.from({ length: 13 }, (_, j) => {
+    const u = j / 12, v = 1 - u, x = v * v * a.x + 2 * v * u * cx + u * u * pb.x, y = v * v * a.y + 2 * v * u * cy + u * u * pb.y;
+    const flip = o.face && pb.x < a.x ? ' scaleX(-1)' : '';
+    return { transform: `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${((o.spin || 0) * Math.sin(u * Math.PI * 2)).toFixed(1)}deg) scale(${(0.7 + 0.3 * Math.sin(u * Math.PI)).toFixed(2)})${flip}`, opacity: j === 0 ? 0 : j === 12 ? 0.9 : 1 };
+  });
+  const an = d.animate(kf, { duration: (o.dur || 600) * k, delay: (o.delay || 0) * k, easing: o.ease || 'cubic-bezier(.35,.05,.45,1)', fill: 'forwards' });
+  an.onfinish = () => { d.remove(); if (epoch === playbackEpoch && onLand) onLand(pb); };
+}
+/** 莫卡兄弟戰技：遞出一份契約，落在被代理人身上時蓋上「兄友／弟恭」的冰藍印章 */
+function contractFx(s, t, f) {
+  if (!t) return;
+  Sound.play('contract');
+  flyProp(s, t, 'contract', '<b></b><i></i><i></i><i></i>', { lift: 110, spin: 14, dur: 640 }, b => {
+    const d = fxDiv('mocha-seal', b.x, b.y, `animation-duration:${0.8 * FXK()}s`, 900); d.textContent = f.mark || '';
+    burst(b, 'frost', '#9fe4ff', 0.45); addCls(t, 'contractpulse');
+    floatText(t, f.sw ? `印記切換［${f.mark}］` : `被代理人［${f.mark}］`, 'escort');
+  });
+}
+/** 代理執行-弟：一疊浮報的預算單據從莫卡兄弟撒向全隊，落下時換成精銳的軍階 */
+function budgetFx(s, f) {
+  Sound.play('budget');
+  (f.tgts || []).map(cardEl).filter(Boolean).forEach((t, i) => flyProp(s, t, 'receipt', '<i></i><i></i>', { lift: 140 + i * 18, spin: 40, dur: 620, delay: i * 70 }, b => {
+    const d = fxDiv('rankpop', b.x, b.y - 40, `animation-duration:${0.9 * FXK()}s`, 1000); d.innerHTML = '<i></i><i></i>';
+    addCls(t, 'contractpulse'); sparks(b, '#bfefff', 6, 40);
+  }));
+}
+/** 阿蘭戰技：信號彈拉出火光，蜂巢狀的護盾由近到遠依序罩住每一張角色卡 */
+function barrierFx(s, f) {
+  const k = FXK(), a = s ? center(s) : null;
+  Sound.play('barrier');
+  if (s) burst({ x: a.x, y: a.r.top + a.r.height * 0.3 }, 'muzzle', '#ffd08a', 0.3);
+  (f.tgts || []).map(cardEl).filter(Boolean).forEach(t => {
+    const r = t.getBoundingClientRect(), dist = a ? Math.abs(r.left + r.width / 2 - a.x) : 0, wait = 80 + dist * 0.35;
+    if (a && t !== s) fxLine({ x: a.x, y: a.r.top + 20 }, { x: r.left + r.width / 2, y: r.top + 20 }, '#ffb36b', wait - 60, 0.3);
+    later(() => {
+      const d = document.createElement('div');
+      d.className = 'alan-dome'; d.style.cssText = `left:${r.left - 6}px;top:${r.top - 6}px;width:${r.width + 12}px;height:${r.height + 12}px;animation-duration:${0.9 * k}s`;
+      $('#fx').appendChild(d); setTimeout(() => d.remove(), 950 * k);
+    }, wait);
+  });
+}
 /** 敵方終結技：目標取自接下來這名敵人造成的傷害紀錄（我方角色卡的位置） */
 function playEnemyUlt(ev) {
   const key = ev.fx.key, ids = [];
@@ -531,7 +623,7 @@ function scheduleUltHits(show) {
   let last = -1;
   for (let i = 0; i < queue.length; i++) {
     const q = queue[i], k = q.fx && q.fx.kind;
-    if (ULT_STOP.has(q.entry.type) || k === 'follow' || k === 'cashout' || k === 'loomRun' || k === 'flowExt') break;
+    if (ULT_STOP.has(q.entry.type) || k === 'follow' || k === 'proxy' || k === 'cashout' || k === 'loomRun' || k === 'flowExt') break;
     if (k === 'dmg' || k === 'dot') last = i;
   }
   if (last < 0) return;
@@ -586,7 +678,8 @@ function ultMode() {
 function clearCombatFx() {
   playbackEpoch++; dotChain = false; cbHold = 0;
   impactTimers.forEach(clearTimeout); impactTimers.clear();
-  document.querySelectorAll('.drift-car,.drift-skid,.suffer-fx,.phaseban,.cutin').forEach(el => el.remove());
+  document.querySelectorAll('.drift-car,.drift-skid,.suffer-fx,.phaseban,.cutin,.kane-net,.fbanner').forEach(el => el.remove());
+  document.querySelectorAll('.net-caught').forEach(el => el.classList.remove('net-caught'));
   clearTimeout(ultHitTimer);
   UltFx.stop();
   UltCine.stop();
@@ -723,7 +816,7 @@ function riemannFx(n, construct, curve = {}) {
   };
   requestAnimationFrame(step);
 }
-/** 追加攻擊：戰場上滑過一條橫幅（發動者立繪、技能名稱、屬性點綴） */
+/** 追加攻擊與代理執行共用橫幅；代理依事件記錄的實際執行者選取單人頭像。 */
 const FB_PARTS = { fire: 'ember', ice: 'shard', wind: 'streak', water: 'drop', phys: 'cut', space: 'cell', luck: 'coin', thunder: 'bolt', grass: 'leaf', sorrow: 'drop', joy: 'ember', anger: 'ember', mirth: 'coin' };
 function followBanner(f) {
   const W = viewState();
@@ -731,17 +824,25 @@ function followBanner(f) {
   const field = $('.field');
   if (!u || !field) return;
   document.querySelectorAll('#fx .fbanner').forEach(e => e.remove());   // 連續追擊：只留最新的一條
-  const ch = Engine.CHARS[u.key], col = ELEM_COLOR[u.elem] || '#fff', r = field.getBoundingClientRect(), art = Art.get(u.key);
+  const proxy = f.kind === 'proxy';
+  const role = proxy && f.role === 'elder' ? '兄' : proxy && f.role === 'younger' ? '弟' : '';
+  const artKey = proxy && role ? 'mocha_' + f.role : u.key;
+  const ch = Engine.CHARS[u.key], col = ELEM_COLOR[u.elem] || '#fff', r = field.getBoundingClientRect(), art = Art.get(artKey);
+  const label = proxy ? '代理執行' : '追加攻擊', who = role ? '莫卡兄弟・' + role : ch.fullName || ch.name;
+  const duration = proxy ? 1.05 : 1.25;
+  const left = proxy ? Math.max(12, Math.min(r.left + 14, innerWidth - Math.min(440, innerWidth - 24) - 12)) : r.left + 14;
   const part = FB_PARTS[u.elem] || 'cut';
   const parts = Array.from({ length: 14 }, (_, i) => `<i class="fb-p ${part}" style="left:${(8 + Math.random() * 84).toFixed(0)}%;top:${(10 + Math.random() * 80).toFixed(0)}%;--dx:${((Math.random() - 0.3) * 120).toFixed(0)}px;--dy:${((Math.random() - 0.5) * 70).toFixed(0)}px;animation-delay:${(0.12 + i * 0.03).toFixed(2)}s"></i>`).join('');
   const d = document.createElement('div');
-  d.className = 'fbanner e-' + u.elem;
-  d.style.cssText = `left:${r.left + 14}px;top:${r.top + r.height * 0.4}px;--c:${col};animation-duration:${(1.25 * FXK()).toFixed(2)}s`;
+  d.className = 'fbanner e-' + u.elem + (proxy ? ' fb-proxy ' + f.role : '');
+  d.dataset.kind = f.kind; d.dataset.art = artKey;
+  d.setAttribute('aria-label', `${label}${role ? '・' + role : ''}：${f.name || label}`);
+  d.style.cssText = `left:${left}px;top:${r.top + r.height * 0.4}px;--c:${col};animation-duration:${(duration * FXK()).toFixed(2)}s`;
   d.innerHTML = `<div class="fb-band"></div>${parts}
-    <div class="fb-art">${art ? `<span style="${Art.bg(u.key, 'face', 260)}"></span>` : `<b>${esc(ch.name[0])}</b>`}</div>
-    <div class="fb-txt"><small>追加攻擊 · FOLLOW-UP</small><b>${esc(f.name || '追加攻擊')}</b><em>${esc(ch.fullName || ch.name)}<span>${esc(ELEM_NAME[u.elem])}</span></em></div>`;
+    <div class="fb-art">${art ? `<span style="${Art.bg(artKey, 'face', 260)}"></span>` : `<b>${esc(ch.name[0])}</b>`}</div>
+    <div class="fb-txt"><small>${label} · ${proxy ? 'PROXY' : 'FOLLOW-UP'}${role ? `<i class="fb-role">${role}</i>` : ''}</small><b>${esc(f.name || label)}</b><em>${esc(who)}<span>${esc(ELEM_NAME[u.elem])}</span></em></div>`;
   $('#fx').appendChild(d);
-  setTimeout(() => d.remove(), 1300 * FXK() + 100);
+  setTimeout(() => d.remove(), (duration * 1000 + 50) * FXK() + 100);
 }
 /**
  * 亞歷山卓秘技：警車從左側甩尾切入，橫向飄移掃過敵方全體 → 輪胎煙、煞車痕、紅藍警燈、風刃
@@ -904,7 +1005,12 @@ function fx(f) {
       if (!f.cine) { showCutin(f.src); Sound.play('ultArm'); }
       break;
     case 'cast': addCls(s, 'lunge'); break;
+    case 'proxy':
+      if (f.role === 'younger') budgetFx(s, f);   // 代理執行-弟：浮報的預算單據飛向全隊，換成精銳的軍階
+    // falls through
     case 'follow': addCls(s, 'lunge'); followBanner(f); Sound.play('ultReady', { gap: 200 }); break;
+    case 'contract': contractFx(s, t, f); break;   // 莫卡兄弟：遞出契約、蓋上印記
+    case 'barrier': barrierFx(s, f); break;        // 阿蘭：為全隊展開護盾
     case 'phase': phaseFx(f, s); break;   // 首領轉階段
     case 'cleanse': if (t) { addCls(t, 'cleanse'); floatText(t, '負面效果清除', 'shield'); burst(center(t), 'ripple', '#e8f0ff', 0.6); } break;   // 轉階段淨化
     case 'av': avArrow(f); break;          // 行動值改變：行動條上的箭頭
@@ -947,14 +1053,18 @@ function fx(f) {
       cbHold = 0; addCls($('#cashbox'), 'cb-fire'); cashBanner(f); Sound.play('cashout');
       break;
     }
-    case 'model':    // 馬克：指定榜樣（筆記本的一頁飛向榜樣）
-      if (s && t && s !== t) { drawLine(s, t, '#4fa8ff'); flyChip(s, t, '📓 榜樣', '#4fa8ff'); }
-      addCls(t, 'modelpulse'); Sound.play('model');
+    case 'model':    // 馬克：筆記本撕下的一頁飄向榜樣，落下時泛起漣漪
+      Sound.play('model');
+      flyProp(s, t, 'page', '<i></i><i></i><i></i>', { lift: 120, spin: 30, dur: 620 }, b => {
+        addCls(t, 'modelpulse'); burst(b, 'ripple', '#4fa8ff', 0.6); burst({ x: b.x, y: b.y + 10 }, 'ripple', '#bfe6ff', 0.45); floatText(t, '榜樣', 'escort');
+      });
       break;
-    case 'escort':   // 亞歷山卓：護航專車（紅藍警燈的光從亞歷山卓掃到目標）
-      if (s && t && s !== t) drawLine(s, t, '#5fe3a8');
-      addCls(t, 'escortpulse'); floatText(t, '🚓 護航專車', 'escort');
+    case 'escort':   // 亞歷山卓：迷你警車鳴著警笛開到目標身邊，紅藍警燈閃過
       Sound.play('escort');
+      flyProp(s, t, 'cruiser', '<i class="lb"></i>', { lift: 40, dur: 560, ease: 'cubic-bezier(.5,0,.2,1)', face: true }, b => {
+        addCls(t, 'escortpulse'); fxDiv('siren', b.x - 22, b.y - 30, `--c:#ff3a4a;animation-duration:${0.32 * FXK()}s`, 400);
+        later(() => fxDiv('siren', b.x + 22, b.y - 30, `--c:#3a7aff;animation-duration:${0.32 * FXK()}s`, 400), 90); floatText(t, '護航專車', 'escort');
+      });
       break;
     default: break;
   }
@@ -994,7 +1104,7 @@ const BUFF_INFO = {
   '告死': ['減益', '米勒秘技：受到的持續傷害提高 15%。'],
   '盛大告別': ['增益', '米勒天賦：星流到達「極長」時進入。米勒攻擊敵人時，額外觸發目標身上全部悲悼各一次（不推進階段、不消除）。星流計時結束時消失。'],
   '陰雨連綿': ['增益', '米勒天賦：星流到達「極消」時進入。可附加的悲悼最大數量 +1。星流計時結束時消失。'],
-  '焦土狙擊手': ['增益', '妙具「焦土狙擊手」4 件：穿戴者投入的餘料參與兌現匣的兌現後，擊破特攻提高 20%。'],
+  '焦土狙擊手': ['增益', '妙具「焦土狙擊手」4 件：穿戴者投入的餘料參與兌現匣的兌現後，攻擊力提高 15%。'],
   '偵探的放大鏡': ['增益', '妙具「偵探的放大鏡」4 件：施放終結技後，暴擊率提高 12%。'],
   '冰封的帳簿': ['增益', '妙具「冰封的帳簿」4 件：穿戴者施放終結技時，我方全體暴擊傷害提高 16%。'],
   '代理人的委任狀': ['增益', '妙具「代理人的委任狀」4 件：穿戴者施放戰技後，我方全體攻擊力提高 8%。'],
@@ -1035,9 +1145,9 @@ const ST_INFO = {
   peek: ['管中窺豹', '標記', '凱恩天賦。只會存在於一名敵人身上。被我方攻擊命中時：凱恩 +1 線索，該敵人行動提前 10%。該敵人行動時，凱恩發動追加攻擊。凱恩戰技命中時轉為現行犯。持有者死亡時轉移至生命值最低的敵人。'],
   flagrant: ['現行犯', '標記', '凱恩戰技命中管中窺豹時轉變而成。場上有現行犯時，凱恩普攻替換為強化普攻「收網」。被命中與行動時的效果同管中窺豹。凱恩終結技對其額外 +200% 傷害，並將其轉回管中窺豹。'],
   broken: ['弱點擊破', '狀態', '韌性歸零（舊機制）。受到的傷害不再有 0.9 倍的韌性減免。將在該敵人下一次回合開始時恢復韌性。'],
-  proxy: ['被代理人', '增益', '莫卡兄弟戰技指定。攻擊力 +20%、暴擊傷害 +20%。持有印記且莫卡兄弟有 ≥2 默契時，會在回合開始時觸發代理執行。'],
+  proxy: ['被代理人', '增益', '莫卡兄弟戰技指定。攻擊力 +20%、暴擊傷害 +20%。持有印記且莫卡兄弟有 ≥2 默契時，會在確認普攻／戰技後、正式施放前觸發代理執行。'],
   mark: ['印記', '標記', '「兄友」→ 代理執行-兄（全體冰傷＋疑點），「弟恭」→ 代理執行-弟（全體精銳）。每次執行後切換。只有被代理人的印記會生效。'],
-  tacit: ['默契', '資源', '莫卡兄弟的資源。被代理人回合開始時若 ≥ 2 點，消耗 2 點插入一次代理執行。'],
+  tacit: ['默契', '資源', '莫卡兄弟的資源。被代理人確認普攻／戰技時若 ≥ 2 點，消耗 2 點，在本人施放前插入一次代理執行。'],
   clues: ['線索', '資源', '凱恩的資源（最多 14 層）。追加攻擊時若大於等於 7 層，消耗 7 層並立刻獲得額外回合（每回合 1 次）。'],
   enh: ['收網就緒', '狀態', '場上有現行犯時，凱恩的普攻替換為強化普攻「收網」：對全體造成 300% 起的物理傷害，不恢復戰技點。'],
   cover: ['掩護（阿蘭）', '資源', '最多 3 點。持有時阿蘭的普攻替換為強化普攻、無法使用戰技，提供的護盾量 +10%。強化普攻消耗 1 點；歸零時額外投入 1 份火屬性餘料。'],
@@ -1057,12 +1167,126 @@ const ST_INFO = {
   stun: ['禁錮', '控制', '束縛者施加。跳過下一個回合。「壁壘」可抵抗。'],
   adv: ['待拉條', '狀態', '在自己回合中獲得的行動提前，會在本回合結束、行動值重置後才生效。'],
 };
-function statusChip(cls, text, st) { return `<span class="chip ${cls}" data-st="${esc(st)}">${esc(text)}</span>`; }
+/* ---------- 狀態小圖標 ----------
+ * 特殊狀態：各自的圖示，底色是效果給予者的屬性色（例如護航專車＝警笛、生死角力＝鐵鍊）。
+ * 常規效果（增傷、受到傷害提高、行動提前等）：常規模板，不上色，右上角以箭頭標示提高／降低。
+ * 右下角的數字是剩餘回合（沒有剩餘回合就不顯示）；左上角的小數字是層數或資源值。點圖標看完整說明。 */
+const GLYPH = {
+  chain: '<rect x="1.5" y="8.5" width="11" height="7" rx="3.5"/><rect x="11.5" y="8.5" width="11" height="7" rx="3.5"/><path d="M7 12h10"/>',
+  siren: '<path d="M6 17v-5a6 6 0 0 1 12 0v5"/><path d="M4 17h16v3H4z"/><path d="M12 2.5v2M3.5 6l1.6 1.4M20.5 6l-1.6 1.4"/><path d="M10 10a2 2 0 0 1 2-2"/>',
+  cross: '<path d="M12 3v18M7.5 15h9"/><circle cx="12" cy="7" r="3.2"/>',
+  belt: '<path d="M5 3l14 18"/><rect x="8.5" y="9.5" width="7" height="5" rx="1"/><path d="M12 11v2"/>',
+  cuffs: '<circle cx="7" cy="15" r="4"/><circle cx="17" cy="15" r="4"/><path d="M9.5 11.5 11 8h2l1.5 3.5"/>',
+  ticket: '<path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M8 10.5h8M8 13.5h5"/>',
+  box: '<path d="M3 8l9-4 9 4v9l-9 4-9-4z"/><path d="M3 8l9 4 9-4M12 12v9"/>',
+  question: '<path d="M9 9a3 3 0 1 1 4.2 2.7c-.8.4-1.2 1-1.2 1.8V15"/><circle cx="12" cy="18.5" r="1" fill="currentColor"/>',
+  chevron: '<path d="M5 11l7-5 7 5M5 17l7-5 7 5"/>',
+  receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M12 5.5v13" stroke-dasharray="2 2"/>',
+  shake: '<path d="M2.5 11l4-4 5 2.5L16 7l5.5 4-6.5 6.5-3-2-3 2z"/><path d="M9 13l3 2"/>',
+  bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  wall: '<path d="M3 6h18v12H3zM3 10h18M3 14h18M8 6v4M14 6v4M11 10v4M17 10v4M8 14v4M14 14v4"/>',
+  converge: '<path d="M4 4l5 5M20 4l-5 5M4 20l5-5M20 20l-5-5"/><circle cx="12" cy="12" r="2.2"/>',
+  breach: '<circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><path d="M10.5 8.5 13 11l-2 2 2.5 2.5"/>',
+  coins: '<ellipse cx="9" cy="7.5" rx="5" ry="2.5"/><path d="M4 7.5v4c0 1.4 2.2 2.5 5 2.5"/><ellipse cx="15" cy="14.5" rx="5" ry="2.5"/><path d="M10 14.5v3c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-3"/>',
+  torn: '<path d="M6 3h8l4 4v6l-3 2 3 2v4H6z"/><path d="M9 9h5M9 13h4"/>',
+  letter: '<rect x="3" y="6" width="18" height="13" rx="1"/><path d="M3 7l9 6 9-6"/>',
+  star: '<path d="M12 3l2.6 5.6 6 .6-4.5 4 1.3 6L12 16.3l-5.4 2.9 1.3-6-4.5-4 6-.6z"/>',
+  rain: '<path d="M6 14a4.5 4.5 0 0 1 1.2-8.8A6 6 0 0 1 18 7a3.6 3.6 0 0 1 0 7z"/><path d="M8 17l-1 3M12 17l-1 3M16 17l-1 3"/>',
+  note: '<path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6z"/><path d="M6 3v18M9.5 8h5.5M9.5 12h5.5"/>',
+  eye: '<path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  swirl: '<path d="M4 12a8 8 0 1 0 8-8"/><path d="M8 12a4 4 0 1 0 4-4"/>',
+  drop: '<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/><path d="M9.5 14a2.5 2.5 0 0 0 2.5 2.5"/>',
+  ruler: '<path d="M3 16 16 3l5 5L8 21z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2"/>',
+  grid: '<path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16"/>',
+  badge: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M12 7l1.4 2.8 3 .4-2.2 2.1.5 3L12 13.8l-2.7 1.5.5-3-2.2-2.1 3-.4z"/>',
+  slash: '<path d="M4 20 20 4M8 21l13-13"/><path d="M6 9.5c0 1.2-.8 2.2-1.8 2.2S2.5 10.7 2.5 9.5 4.2 6 4.2 6 6 8.3 6 9.5z" fill="currentColor"/>',
+  splat: '<circle cx="12" cy="12" r="3.5" fill="currentColor"/><path d="M12 2.5v4.5M12 17v4.5M2.5 12H7M17 12h4.5M5 5l3.3 3.3M15.7 15.7 19 19M19 5l-3.3 3.3M8.3 15.7 5 19"/>',
+  tear: '<path d="M12 3s5 6 5 10a5 5 0 0 1-10 0c0-4 5-10 5-10z"/><path d="M10 13.5a2 2 0 0 0 2 2"/>',
+  lens: '<circle cx="10" cy="10" r="6"/><path d="M14.5 14.5 21 21"/><circle cx="10" cy="10" r="2" fill="currentColor"/>',
+  alert: '<path d="M12 3 2 20h20z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="17" r="1" fill="currentColor"/>',
+  flask: '<path d="M9 3h6M10 3v6L4 19a1.5 1.5 0 0 0 1.3 2h13.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M6.5 15h11"/>',
+  tally: '<path d="M5 5v14M9 5v14M13 5v14M17 5v14M3 15l18-6"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  shieldbreak: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M12 2l-2 6 3 3-2 5 1 6"/>',
+  two: '<text x="12" y="17.5" text-anchor="middle" font-size="15" font-weight="900" font-family="Georgia,serif" fill="currentColor" stroke="none">Ⅱ</text>',
+  umbrella: '<path d="M3 12a9 9 0 0 1 18 0z"/><path d="M12 12v7a2 2 0 0 0 4 0"/>',
+  stamp: '<path d="M9 3h6v6l3 3v3H6v-3l3-3z"/><path d="M5 18.5h14v2.5H5z"/>',
+  model: '<circle cx="12" cy="12" r="9"/><path d="M12 6.5l1.6 3.4 3.7.4-2.8 2.5.8 3.7L12 14.6l-3.3 1.9.8-3.7-2.8-2.5 3.7-.4z"/>',
+  spread: '<circle cx="12" cy="12" r="2.2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/>',
+  net: '<path d="M3 5c6 3 12 3 18 0M3 12c6 3 12 3 18 0M3 19c6-3 12-3 18 0M6 4v16M12 4v16M18 4v16"/>',
+  plus5: '<text x="12" y="16.5" text-anchor="middle" font-size="11" font-weight="900" fill="currentColor" stroke="none">+5</text>',
+  link: '<path d="M6 12c0-2.2 1.6-3.8 3.4-3.8 3 0 4.2 7.6 7.2 7.6 1.8 0 3.4-1.6 3.4-3.8s-1.6-3.8-3.4-3.8c-3 0-4.2 7.6-7.2 7.6C7.6 15.8 6 14.2 6 12z"/>',
+  pin: '<path d="M9 3h6l-1 6 4 4H6l4-4z"/><path d="M12 13v8"/>',
+  scope: '<circle cx="12" cy="12" r="8"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/>',
+  book: '<path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6v14"/>',
+  ticks: '<path d="M3 18h18M5 18v-7M9 18v-4M13 18v-7M17 18v-4"/>',
+  ff: '<path d="M3 6l8 6-8 6zM12 6l8 6-8 6z"/>',
+  sword: '<path d="M14 3.5h6.5V10L9.5 21 6 17.5z"/><path d="M4.5 14.5l5 5M3 21l2.5-2.5"/>',
+  burst: '<path d="M12 2l2 6 6-2-4 5 5 3-6 1 1 6-4-4-4 4 1-6-6-1 5-3-4-5 6 2z"/>',
+  shield: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/>',
+  wing: '<path d="M3 17h11l6-6M3 12h9M3 7h6"/>',
+  ring: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/>',
+  hammer: '<path d="M4 20l9-9M11 5l5-2 5 5-2 5z"/>',
+  hide: '<path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><path d="M4 4l16 16"/>',
+  heal: '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
+  dotup: '<path d="M10 4s5 6 5 10a5 5 0 0 1-10 0c0-4 5-10 5-10z"/><path d="M19 4v6M16 7h6"/>',
+};
+// 特殊狀態：名稱 → [圖示, 給予者]（給予者決定底色的屬性）
+const SPECIAL_BUFF = {
+  '護航專車': ['siren', 'alexandra'], '請系好安全帶': ['belt', 'alexandra'], '押送': ['cuffs', 'alexandra'], '違規開罰': ['ticket', 'alexandra'], '後勤支援': ['box', 'alexandra'],
+  '疑點': ['question', 'mocha'], '精銳': ['chevron', 'mocha'], '帳單分開結': ['receipt', 'mocha'], '內線交易·速': ['shake', 'mocha'], '內線交易·暴': ['shake', 'mocha'], '售後服務': ['bell', 'mocha'],
+  '壁壘': ['wall', 'alan'], '收束': ['converge', 'alan'], '破綻': ['breach', 'alan'],
+  '財源滾滾': ['coins', 'gordon'], '債務糾紛': ['torn', 'gordon'],
+  '花束·罌粟': ['@poppy', 'miller'], '花束·白菊': ['@mum', 'miller'], '回響': ['bell', 'miller'], '告死': ['letter', 'miller'], '盛大告別': ['star', 'miller'], '陰雨連綿': ['rain', 'miller'],
+  '瀆神之軀': ['cross', 'otg'],
+  '實戰演練': ['note', 'mark'], '知悉': ['eye', 'mark'], '流轉·跬步': ['swirl', 'mark'], '流轉·循序': ['swirl', 'mark'], '流轉·而勝': ['swirl', 'mark'], '斂藏': ['drop', 'mark'],
+  '度量': ['ruler', 'hanye'], '構築': ['grid', 'hanye'],
+  '執法權限': ['badge', 'raiden'],
+};
+// 角色機制的狀態（不在 buffs 裡）：s:key → [圖示, 給予者 或 null（常規）, 是否為資源]
+const SPECIAL_ST = {
+  lacer: ['slash', 'longzhao'], bb: ['splat', 'longzhao'], record: ['tally', 'longzhao'], peek: ['lens', 'kane'], flagrant: ['lens', 'kane'], enh: ['net', 'kane', 1], clues: ['pin', 'kane', 1],
+  sample: ['flask', 'hanye'], spread: ['spread', 'hanye', 1], recur: ['plus5', 'hanye', 1], ticks: ['ticks', 'hanye', 1],
+  phase2: ['two', 'raiden'], duel: ['chain', 'otg'], suffer: ['cross', 'otg', 1], mourn: ['tear', 'miller'], funeral: ['umbrella', 'miller'],
+  proxy: ['stamp', 'mocha'], mark: ['stamp', 'mocha'], tacit: ['link', 'mocha', 1], cover: ['scope', 'alan', 1], model: ['model', 'mark'], exp: ['book', 'mark', 1], siren: ['siren', 'alexandra', 1],
+  stun: ['lock', null], broken: ['shieldbreak', null], adv: ['ff', null],
+};
+// 金句、妙具給的效果一律走常規模板：沒有數值欄位的，依實際效果指定圖示
+const REG_NAME = { '流動資本': 'sword', '鎖定': 'burst', '罪證確鑿': 'star', '附加條款': 'sword', '不退讓': 'shield', '封鎖': 'shieldbreak', '受難': 'burst', '開道': 'burst',
+  '利滾利': 'dotup', '履約保證': 'sword', '整理筆記': 'burst', '雨聲': 'dotup', '草稿': 'star', '讓路': 'wing', '演算': 'star' };
+// 常規模板：依效果的主要數值挑圖示
+const REG_STAT = [['atkPct', 'sword'], ['atkFlat', 'sword'], ['dmgBonus', 'burst'], ['cr', 'star'], ['cd', 'star'], ['dmgTakenUp', 'shieldbreak'], ['defRed', 'shield'], ['dmgTakenRed', 'shield'],
+  ['dmgDealtRed', 'sword'], ['spdPct', 'wing'], ['resRed', 'ring'], ['resPen', 'ring'], ['aggroDown', 'hide'], ['healUp', 'heal']];
+const giverColor = k => ELEM_COLOR[k === 'raiden' ? 'thunder' : (Engine.CHARS[k] || {}).elem] || '#8a8aa0';
+/** 淺色底（例如物理的銀白）改用深色圖示，維持對比 */
+function lightColor(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return false;
+  const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 175;
+}
+/** 一個狀態圖標。o = { glyph, by, reg, down, turns, stack, title, hot } */
+function stIcon(st, o) {
+  const g = o.glyph || '';
+  const face = g[0] === '@' ? `<i class="sfl ${g === '@poppy' ? 'r' : 'w'}"></i>` : GLYPH[g] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${GLYPH[g]}</svg>` : `<em>${esc((o.title || '?')[0])}</em>`;
+  const cls = ['sic', o.reg ? 'reg' : 'sp', o.res ? 'res' : '', o.down ? 'down' : o.reg ? 'up' : '', o.hot ? 'hot' : '', o.solid ? 'solid-mark' : ''].join(' ');
+  const ec = o.reg ? '' : giverColor(o.by);
+  return `<span class="${cls}${ec && lightColor(ec) ? ' lt' : ''}" data-st="${esc(st)}" title="${esc(o.title || '')}"${ec ? ` style="--ec:${ec}"` : ''}>${face}${o.stack > 1 || (o.res && o.stack != null) ? `<i class="stk">${o.stack}</i>` : ''}${o.turns > 0 ? `<b>${o.turns}</b>` : ''}</span>`;
+}
+/** 角色機制的狀態（裂傷、管中窺豹、生死角力……） */
+function statusChip(key, title, o) {
+  o = o || {};
+  const [glyph, by, res] = SPECIAL_ST[key] || ['', null];
+  return stIcon('s:' + key, Object.assign({ glyph, by, reg: !by, res: !!res, title }, o));
+}
 function buffChips(u) {
   return u.buffs.map(b => {
-    const bad = b.debuff || b.stats.defRed || b.stats.dmgDealtRed || b.stats.dmgTakenUp;
-    const label = (b.stacks ? `${b.name}×${b.stacks}` : b.name) + (b.dur < 900 ? `(${b.dur})` : '');
-    return statusChip(bad ? 'debuff' : 'buff', label, 'b:' + b.name);
+    const bad = !!(b.debuff || b.stats.defRed || b.stats.dmgDealtRed || b.stats.dmgTakenUp);
+    const sp = SPECIAL_BUFF[b.name], turns = b.dur < 900 ? b.dur : 0;
+    const title = `${b.name}${b.stacks ? ` ×${b.stacks}` : ''}${turns ? `（剩 ${turns} 回合）` : ''}${BUFF_INFO[b.name] ? '：' + BUFF_INFO[b.name][1] : ''}`;
+    if (sp) return stIcon('b:' + b.name, { glyph: sp[0], by: sp[1], turns, stack: b.stacks, title });
+    const st = REG_STAT.find(([k]) => b.stats[k]);
+    return stIcon('b:' + b.name, { glyph: REG_NAME[b.name] || (st ? st[1] : ''), reg: true, down: bad, turns, stack: b.stacks, title });
   }).join('');
 }
 function showStatus(chipEl) {
@@ -1256,17 +1480,17 @@ function hpBar(e, pu, hpLoss) {
 }
 function enemyUnit(e, W, S) {
   const c = [];
-  if (e.broken) c.push(statusChip('brk', '弱點擊破', 's:broken'));
-  if (e.lacer.length) { const o = e.lacer.filter(x => x.orig).length; c.push(statusChip('dot', `裂傷×${e.lacer.length}${o ? `（原罪 ${o}）` : ''}`, 's:lacer')); }
-  if (e.bloodBreak) c.push(statusChip('bb', `血破×${e.bloodBreak}`, 's:bb'));
-  if (e.record) c.push(statusChip('', `記錄 ${e.record}`, 's:record'));
-  if (e.peek) c.push(statusChip('kane', '管中窺豹', 's:peek'));
-  if (e.flagrant) c.push(statusChip('hot', '現行犯', 's:flagrant'));
-  if (e.sample) c.push(statusChip('hanye', '樣本', 's:sample'));
-  if (e.type === 'raiden' && e.phase2) c.push(statusChip('hot', '二階段', 's:phase2'));
-  if (W.duel && W.duel.id === e.id) c.push(statusChip('hot', `生死角力 ${W.duel.dur}`, 's:duel'));
-  if (e.mourn && e.mourn.length) c.push(statusChip('dot sorrow', `悲悼×${e.mourn.length}（${e.mourn.map(m => m.st).join('·')}）`, 's:mourn'));
-  if (e.pendingAdv) c.push(statusChip('buff', `待拉條 ${Engine.pct(e.pendingAdv)}`, 's:adv'));
+  if (e.broken) c.push(statusChip('broken', '弱點擊破', { down: true }));
+  if (e.lacer.length) { const o = e.lacer.filter(x => x.orig).length; c.push(statusChip('lacer', `裂傷 ×${e.lacer.length}${o ? `（原罪 ${o}）` : ''}`, { stack: e.lacer.length, turns: Math.max(...e.lacer.map(x => x.dur)), hot: o > 0 })); }
+  if (e.bloodBreak) c.push(statusChip('bb', `血破 ×${e.bloodBreak}`, { stack: e.bloodBreak }));
+  if (e.record) c.push(statusChip('record', `裂痕記錄 ${e.record}`, { stack: e.record }));
+  if (e.flagrant) c.push(statusChip('flagrant', '現行犯 · 收網就緒（實心）', { hot: true, solid: true }));
+  else if (e.peek) c.push(statusChip('peek', '管中窺豹（空心）'));
+  if (e.sample) c.push(statusChip('sample', '樣本'));
+  if (e.type === 'raiden' && e.phase2) c.push(statusChip('phase2', '二階段'));
+  if (W.duel && W.duel.id === e.id) c.push(statusChip('duel', `生死角力（剩 ${W.duel.dur} 回合）`, { turns: W.duel.dur }));
+  if (e.mourn && e.mourn.length) c.push(statusChip('mourn', `悲悼 ×${e.mourn.length}（階段 ${e.mourn.map(m => m.st).join('·')}）`, { stack: e.mourn.length }));
+  if (e.pendingAdv) c.push(statusChip('adv', `待拉條 ${Engine.pct(e.pendingAdv)}`));
   const type = Engine.ENEMY_TYPES[e.type];
   // 行動預覽：預計損失的生命、韌性以浮動的殘影標示
   const pu = curPv && e.alive && curPv.res.units.find(x => x.id === e.id);
@@ -1351,29 +1575,29 @@ function wantedMark(n) {
 }
 function allyCard(a, W, S, idx) {
   const c = [];
-  if (a.mark) c.push(statusChip(W.proxy === a.id ? 'hot' : 'mocha', W.proxy === a.id ? `被代理人［${a.mark}］` : `印記［${a.mark}］`, W.proxy === a.id ? 's:proxy' : 's:mark'));
-  if (a.key === 'mocha') c.push(statusChip('mocha', `默契 ${a.tacit}`, 's:tacit'));
+  if (a.mark) c.push(W.proxy === a.id ? statusChip('proxy', `被代理人［${a.mark}］`, { hot: true }) : statusChip('mark', `印記［${a.mark}］`));
+  if (a.key === 'mocha') c.push(statusChip('tacit', `默契 ${a.tacit}`, { stack: a.tacit || 0, hot: (a.tacit || 0) >= 2 }));
   if (a.key === 'kane') {
-    c.push(statusChip(a.clues > 7 ? 'hot' : 'kane', `線索 ${a.clues}/14`, 's:clues'));
-    if (Engine.kaneEnhanced(W.units)) c.push(statusChip('hot', '收網就緒', 's:enh'));
+    c.push(statusChip('clues', `線索 ${a.clues}/14`, { stack: a.clues || 0, hot: a.clues > 7 }));
+    if (Engine.kaneEnhanced(W.units)) c.push(statusChip('enh', '收網就緒', { hot: true }));
   }
-  if (a.key === 'alan') c.push(statusChip(a.cover ? 'hot' : 'alan', `掩護 ${a.cover}/3`, 's:cover'));
-  if (W.model === a.id && W.units.some(x => x.key === 'mark' && x.alive)) c.push(statusChip('mark', '榜樣', 's:model'));
-  if (a.key === 'mark') c.push(statusChip(a.exp >= 12 ? 'hot' : 'mark', `經驗 ${a.exp || 0}/15`, 's:exp'));
-  if (a.key === 'alexandra') c.push(statusChip(a.siren >= 5 ? 'hot' : 'alexandra', `鳴笛 ${a.siren || 0}/7`, 's:siren'));
+  if (a.key === 'alan') c.push(statusChip('cover', `掩護 ${a.cover}/3`, { stack: a.cover || 0, hot: a.cover > 0 }));
+  if (W.model === a.id && W.units.some(x => x.key === 'mark' && x.alive)) c.push(statusChip('model', '榜樣'));
+  if (a.key === 'mark') c.push(statusChip('exp', `經驗 ${a.exp || 0}/15`, { stack: a.exp || 0, hot: a.exp >= 12 }));
+  if (a.key === 'alexandra') c.push(statusChip('siren', `鳴笛 ${a.siren || 0}/7`, { stack: a.siren || 0, hot: a.siren >= 5 }));
   if (a.key === 'hanye') {
-    c.push(statusChip(a.ticks >= 8 ? 'hot' : 'hanye', `刻度 ${a.ticks || 0}`, 's:ticks'));
-    if (a.spreadReady) c.push(statusChip('hanye', '擴散就緒', 's:spread'));
-    if (a.recurBonus) c.push(statusChip('hot', '遞推 +5', 's:recur'));
+    c.push(statusChip('ticks', `刻度 ${a.ticks || 0}`, { stack: a.ticks || 0, hot: a.ticks >= 8 }));
+    if (a.spreadReady) c.push(statusChip('spread', '擴散就緒', { hot: true }));
+    if (a.recurBonus) c.push(statusChip('recur', '遞推 +5', { hot: true }));
   }
   if (a.key === 'otg') {
-    c.push(statusChip((a.suffer || 0) >= 9 ? 'hot' : 'otg', `苦難 ${a.suffer || 0}/12`, 's:suffer'));
-    if (W.duel) c.push(statusChip('hot', `生死角力 ${W.duel.dur}`, 's:duel'));
+    c.push(statusChip('suffer', `苦難 ${a.suffer || 0}/12`, { stack: a.suffer || 0, hot: (a.suffer || 0) >= 9 }));
+    if (W.duel) c.push(statusChip('duel', `生死角力（剩 ${W.duel.dur} 回合）`, { turns: W.duel.dur }));
   }
-  if (a.lacer && a.lacer.length) c.push(statusChip('dot', `裂傷×${a.lacer.length}`, 's:lacer'));
-  if (a.key === 'miller' && a.funeral) c.push(statusChip('sorrow', `葬禮 ${a.funeral}`, 's:funeral'));
-  if (a.stunned) c.push(statusChip('debuff', '禁錮', 's:stun'));
-  if (a.pendingAdv) c.push(statusChip('buff', `待拉條 ${Engine.pct(a.pendingAdv)}`, 's:adv'));
+  if (a.lacer && a.lacer.length) c.push(statusChip('lacer', `裂傷 ×${a.lacer.length}`, { stack: a.lacer.length, turns: Math.max(...a.lacer.map(x => x.dur)) }));
+  if (a.key === 'miller' && a.funeral) c.push(statusChip('funeral', `葬禮（剩 ${a.funeral} 回合）`, { turns: a.funeral }));
+  if (a.stunned) c.push(statusChip('stun', '禁錮', { down: true }));
+  if (a.pendingAdv) c.push(statusChip('adv', `待拉條 ${Engine.pct(a.pendingAdv)}`));
   const art = Art.get(a.key);
   const enP = Math.min(1, a.energy / a.maxEnergy);
   const full = enP >= 1 - 1e-9;
@@ -1908,10 +2132,10 @@ function renderBattle() {
   let m = '';
   if (armed) {
     const a = byId(armed);
-    const now = !playing && S.phase === 'input';
+    const now = !playing && (S.phase === 'input' || S.phase === 'between');
     const single = Engine.CHARS[a.key].ultTarget === 'enemy';
     m = `<div class="turnban arm">✦ ${esc(a.name)}【${esc(Engine.CHARS[a.key].actions.ult)}】</div>
-      <div class="tgtinfo">${single ? `目標：${tgt ? esc(tgt.name) : '—'}（點敵人切換，再點一次同一個目標發動）` : '群體攻擊'}${now ? '' : ' · 目前不是我方回合，確認後會在當前敵人回合結束時發動'}</div>
+      <div class="tgtinfo">${single ? `目標：${tgt ? esc(tgt.name) : '—'}（點敵人切換，再點一次同一個目標發動）` : '群體攻擊'}${now ? '' : ' · 確認後在最近的插入窗口發動（持續傷害後／技能施放後）'}</div>
       <div class="midbtns"><button class="primary" data-cmd="fireult">${now ? '發動' : '預約發動'}</button><button data-cmd="cancelult">取消（Esc）</button></div>`;
   } else if (ENDED.includes(S.phase) && !playing) {
     const txt = { win: '勝利', lose: '失敗', timeout: '達到輪數上限' }[S.phase];
@@ -1931,7 +2155,7 @@ function renderBattle() {
       m += `<div class="tgtinfo">目標：${tgt ? esc(tgt.name) : '—'}${ch.skillTarget === 'ally' ? ` · 戰技對象：${allyT ? esc(allyT.name) : '—'}` : ''}</div>`;
     }
   }
-  if (ultQueue.length) m += `<div class="qinfo">✦ 預約：${ultQueue.map(id => esc(byId(id).name)).join('、')}（在當前敵人回合結束後發動）</div>`;
+  if (ultQueue.length) m += `<div class="qinfo">✦ 預約：${ultQueue.map(id => esc(byId(id).name)).join('、')}（在最近的回合前或行動後窗口發動）</div>`;
   if (playing) m += `<div class="midbtns"><button data-cmd="skip" class="ghostbtn">⏭ 跳過動畫</button></div>`;
   mid.innerHTML = m;
 
@@ -2173,7 +2397,7 @@ function renderStats(S) {
 /* ================= 設定頁 ================= */
 const CHAR_FIELDS = [
   ['lvl', '等級'], ['baseAtk', '基礎攻擊'], ['atkPct', '攻擊%'], ['hp', '生命'], ['def', '防禦'], ['spd', '速度'],
-  ['cr', '暴擊率%'], ['cd', '暴傷%'], ['dmgBonus', '屬性增傷%'], ['ehr', '效果命中%'], ['effRes', '效果抵抗%'], ['be', '擊破特攻%'], ['err', '能量效率%'],
+  ['cr', '暴擊率%'], ['cd', '暴傷%'], ['dmgBonus', '屬性增傷%'], ['ehr', '效果命中%'], ['effRes', '效果抵抗%'], ['err', '能量效率%'],
   ['maxEnergy', '能量上限'], ['startEnergy', '初始能量%'],
 ];
 const ENEMY_FIELDS = [['wave', '波次'], ['type', '類型', 'type'], ['name', '名稱', 'text'], ['hp', '生命'], ['atk', '攻擊'], ['spd', '速度'],
@@ -2191,6 +2415,8 @@ function renderConfig() {
     <label>演出 <select data-ui="ultAnim"><option value="full">完整</option><option value="short">精簡（約 3 秒）</option><option value="off">快速</option></select></label>
     ${keys.map(k => `<button data-cmd="ulttest" data-key="${k}">▶ ${Engine.CHARS[k].name}</button>`).join('')}</div>
     <p class="notes">試播依上方選擇的模式播放；快速顯示角色專屬施放效果，精簡與完整使用目前戰鬥的敵人陣容。</p></section>`;
+  h += `<section><h2>自律處刑官外觀</h2><label>外觀 <select data-ui="raidenSkin">${opt('raiden', C.ui.raidenSkin, '雷霆-09型（原版）')}${opt('kane', C.ui.raidenSkin, '異相凱恩（彩蛋）')}</select></label>
+    <p class="notes">立即切換戰場、行動條與終結技中的外觀，兩個階段都會套用。技能、通緝機制與數值維持原樣。</p><div id="raidenSkinPreview" class="raiden-skin-preview" aria-label="自律處刑官外觀預覽"></div></section>`;
   h += `<section><h2>隊伍（順序 = 站位，莫卡兄弟終結技的「第一位我方」以此為準）</h2><div class="team">`;
   for (let i = 0; i < 4; i++) {
     h += `<select data-team="${i}">${opt('', C.team[i] || '', '（空）')}${keys.map(k => opt(k, C.team[i], Engine.CHARS[k].name)).join('')}</select>`;
@@ -2252,7 +2478,21 @@ function renderConfig() {
 
   h += `<section class="btns"><button class="primary" data-cfg="apply">儲存並開始自訂戰鬥</button><button data-cfg="reset">恢復預設值</button></section>`;
   $('#config').innerHTML = h;
+  renderRaidenSkinPreview();
 }
+
+function syncRaidenSkin() {
+  if (typeof Art !== 'undefined' && Art.setRaidenSkin) Art.setRaidenSkin(CFG.ui.raidenSkin);
+  document.querySelectorAll('[data-ui=raidenSkin]').forEach(el => { el.value = CFG.ui.raidenSkin === 'kane' ? 'kane' : 'raiden'; });
+}
+function renderRaidenSkinPreview() {
+  const el = $('#raidenSkinPreview');
+  if (!el) return;
+  syncRaidenSkin();
+  el.innerHTML = [false, true].map(phase2 => `<figure class="${phase2 ? 'raiden-phase2' : ''}"><div class="efig">${enemySvg({ type: 'raiden', phase2 })}</div><figcaption>${phase2 ? '第二階段' : '第一階段'}</figcaption></figure>`).join('');
+}
+
+if (typeof Art !== 'undefined' && Art.onReady) Art.onReady(() => { if (view === 'config') renderRaidenSkinPreview(); });
 
 function setPath(obj, path, val) {
   const ks = path.split('.');
@@ -2373,7 +2613,7 @@ function renderPowers() {
       <ul><li>餘料的屬性與角色屬性相同；每次行動逸散：普攻 ${C.RESIDUE.basic} 份、戰技 ${C.RESIDUE.skill} 份、終結技 ${C.RESIDUE.ult} 份（部分角色有額外加成，例如持有掩護的阿蘭 +1）。</li>
         <li>兌現時，<b>最多</b>的元素成為「形制」，決定攻擊形式；<b>次多</b>的元素成為「裝填」，決定附加效果。數量持平時，以先進入兌現匣的元素優先。</li>
         <li>${C.CAP} 份餘料皆為同一元素時，改為進行「原型兌現」。</li>
-        <li>兌現由<b>兌現匣本身</b>發動，不是任何一位隊友。兌現匣的攻擊力與擊破特攻，是這 ${C.CAP} 份餘料投入者的加權平均（投入幾份就佔幾份權重）；傷害 = 兌現匣攻擊力 × 倍率 ×（1 + 擊破特攻），不會暴擊。超過 ${C.CAP} 份的餘料保留到下一次。</li></ul>
+        <li>兌現由<b>兌現匣本身</b>發動，不是任何一位隊友。兌現匣的攻擊力，是這 ${C.CAP} 份餘料投入者的加權平均（投入幾份就佔幾份權重）；傷害 = 兌現匣攻擊力 × 倍率，不會暴擊。超過 ${C.CAP} 份的餘料保留到下一次。</li></ul>
       <div class="pw-scroll"><table class="pw-cash"><tr><th></th><th>形制（最多）</th><th>裝填（次多）</th><th>原型兌現（10 份同元素）</th></tr>${cashRows}</table></div>
       <p class="hint">雷、草目前沒有角色，表格先列出完整設計。兌現匣可以在「設定 → 規則與秘技」關閉。</p></div></section>
     <section><h2>情感・星流</h2>${loreHtml(LORE.emotion)}<div class="pw-box">
@@ -2427,16 +2667,21 @@ function resumeBattle(b) {
   return true;
 }
 
-/** 確認終結技：我方回合立即發動；動畫播放中或敵人回合中則預約，於空檔發動 */
+/** 選技能時或已抵達窗口立即發動；持續傷害／攻擊播放中則排在最近的窗口。 */
 function fireUlt() {
   const id = armed;
   armed = null;
   if (!id || !Engine.canUlt(id)) return renderBattle();
   const S = Engine.state();
-  if (!playing && S.phase === 'input') return run(() => Engine.ult(id));
+  if (!playing && (S.phase === 'input' || S.phase === 'between')) return run(() => Engine.ult(id));
   if (!ultQueue.includes(id)) ultQueue.push(id);
   renderBattle();
   if (!playing) pump();
+}
+function cancelUlt() {
+  armed = null;
+  renderBattle();
+  if (!playing && !pump()) scheduleAuto();
 }
 /** 暫停：停止動畫播放與自動戰鬥，打開暫停選單 */
 function setPaused(v) {
@@ -2491,6 +2736,7 @@ document.addEventListener('change', ev => {
 });
 
 function syncUiControls() {
+  syncRaidenSkin();
   document.querySelectorAll('[data-ui=ultAnim]').forEach(el => { el.value = ultMode(); });
   renderSoundCtl();
   document.querySelector('[data-ui=anim]').checked = !!CFG.ui.anim;
@@ -2554,7 +2800,7 @@ document.addEventListener('click', ev => {
       case 'autotoggle': autoOn = !autoOn; renderBattle(); scheduleAuto(); return;
       case 'skip': flush(); if (!playing) scheduleAuto(); return;
       case 'fireult': if (armed) fireUlt(); return;
-      case 'cancelult': armed = null; renderBattle(); scheduleAuto(); return;
+      case 'cancelult': return cancelUlt();
       case 'claim': {
         const r = Meta.runDungeon(activeDungeon);
         if (r.error) { openModal(`<h2>無法領取</h2><p>${esc(r.error)}</p><p class="hint">可以到「副本」頁補充體力。</p>`); return; }
@@ -2650,8 +2896,9 @@ document.addEventListener('change', ev => {
   }
   if (el.dataset.ui) {
     const k = el.dataset.ui;
-    CFG.ui[k] = el.type === 'checkbox' ? el.checked : k === 'ultAnim' ? el.value : parseFloat(el.value) || 0;
+    CFG.ui[k] = el.type === 'checkbox' ? el.checked : ['ultAnim', 'raidenSkin'].includes(k) ? el.value : parseFloat(el.value) || 0;
     if (k === 'ultAnim') document.querySelectorAll('[data-ui=ultAnim]').forEach(x => { x.value = ultMode(); });
+    if (k === 'raidenSkin') { CFG.ui.raidenSkin = el.value === 'kane' ? 'kane' : 'raiden'; syncRaidenSkin(); renderBattle(); renderRaidenSkinPreview(); }
     if (k === 'speed' && !CFG.ui.speed) CFG.ui.speed = 1;
     if (k === 'anim' && !CFG.ui.anim && playing) flush();
     saveCfg();
@@ -2672,7 +2919,7 @@ document.addEventListener('keydown', ev => {
     if (!$('#modal').classList.contains('hidden')) return closeModal();
   }
   if (view !== 'battle' || ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT') return;
-  if (ev.key === 'Escape' && armed) { armed = null; renderBattle(); scheduleAuto(); return; }
+  if (ev.key === 'Escape' && armed) return cancelUlt();
   if (ev.key === 'Escape') { if (logOpen) return toggleLog(false); return setPaused(!paused); }
   if (paused) return;
   if (ev.key === 'z' && (ev.ctrlKey || ev.metaKey)) { document.querySelector('[data-cmd=undo]').click(); return; }

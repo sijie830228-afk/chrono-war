@@ -163,7 +163,8 @@ document.addEventListener('change', ev => {
 
 /* ================= 啟動 ================= */
 (function start() {
-  Engine.setInterrupts(true);   // 敵人回合之間留空檔，讓預約的終結技插入
+  Engine.setInterrupts(true);
+  Engine.setTurnWindows(true);   // 回合前（持續傷害後）、選擇技能時、技能施放後均可插入終結技
   Stage.mount(document.querySelector('.st-canvas'));
   const d = SaveSys.boot({ cfg: () => CFG, battle: battleSnapshot, status: showSaveStatus });
   applyLoaded(d);

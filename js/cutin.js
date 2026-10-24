@@ -93,6 +93,7 @@ const CastFx = (() => {
     }
   }
   return {
+    evidence: paper,
     theme: key => THEMES[key] || ['#dce5ff','#161b30','終結技'],
     has: key => !!THEMES[key],
     markup(key, options) {

@@ -293,10 +293,20 @@ const Sound = (() => {
       else if (e === 'grass') tone(420, u, 0.09, 0.06, { type: 'triangle', f2t: 520 });
       else bell(1250, u, 0.14, 0.03, { ratio: 1.4 });
     },
+    // 莫卡兄弟遞出契約：紙張滑過 → 蓋章
+    contract: t => { noise(t, 0.22, 0.08, { f: 2600, f2: 1200, q: 0.8, a: 0.03 }); tone(150, t + 0.62, 0.12, 0.2, { f2t: 70, a: 0.002 }); noise(t + 0.62, 0.06, 0.12, { filter: 'lowpass', f: 900 }); bell(mtof(86), t + 0.7, 0.4, 0.03, { ratio: 2.4, verb: 0.4 }); },
+    // 代理執行-弟：一疊單據撒出 → 清脆的入帳聲
+    budget: t => { for (let i = 0; i < 5; i++) noise(t + i * 0.05, 0.1, 0.05, { f: 3000, f2: 1500, q: 1, a: 0.01 }); [79, 83, 86].forEach((m, i) => bell(mtof(m), t + 0.6 + i * 0.06, 0.5, 0.035, { ratio: 2, verb: 0.4 })); },
+    // 阿蘭展開護盾：信號彈點火 → 護盾嗡鳴
+    barrier: t => { noise(t, 0.3, 0.1, { f: 900, f2: 3200, q: 1, a: 0.01 }); tone(220, t + 0.12, 0.7, 0.06, { type: 'triangle', f2t: 440, a: 0.08 }); tone(330, t + 0.18, 0.6, 0.04, { type: 'sine', vib: [7, 6] }); },
     mkUp: t => { [0, 0.05, 0.1].forEach((d, i) => tone(mtof(76 + i * 4), t + d, 0.1, 0.05, { type: 'square', filter: 'lowpass', f: 3000 })); bell(mtof(88), t + 0.16, 0.4, 0.05, { ratio: 2, verb: 0.3 }); },
     mkDown: t => { [0, 0.05, 0.1].forEach((d, i) => tone(mtof(72 - i * 4), t + d, 0.12, 0.05, { type: 'square', filter: 'lowpass', f: 2200 })); tone(140, t + 0.14, 0.3, 0.15, { f2t: 60 }); },
     atk_enemy: t => { swish(t, 0.22, 1800, 500, 0.2); noise(t, 0.08, 0.05, { filter: 'lowpass', f: 400 }); },
 
+    // 收網：證物定位、繃緊的弦、低頻與斷弦同時落下。
+    netPin: t => { [0,.045,.09].forEach(d => { noise(t+d,.022,.1,{filter:'highpass',f:4200}); tone(1800,t+d,.035,.035,{type:'square',filter:'bandpass',f:2300}); }); },
+    netPull: t => { tone(260,t,.27,.08,{type:'triangle',f2t:1450,a:.02}); noise(t,.25,.1,{f:650,f2:4200,q:4,a:.2}); },
+    netSnap: t => { kick(t,.72,sfxBus,{f:135,f2:32,dur:.22}); noise(t,.045,.32,{filter:'highpass',f:3000,a:.001}); tone(1500,t,.09,.06,{type:'triangle',f2t:220}); },
     // 命中
     hit: (t, o) => {
       const e = o.elem || 'phys';

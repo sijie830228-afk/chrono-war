@@ -20,7 +20,7 @@ const Relics = (() => {
   const STAT_LABEL = {
     hpFlat: '生命', atkFlat: '攻擊力', defFlat: '防禦', hpPct: '生命%', atkPct: '攻擊%', defPct: '防禦%',
     spd: '速度', spdPct: '速度%', cr: '暴擊率', cd: '暴擊傷害', ehr: '效果命中', effRes: '效果抵抗',
-    be: '擊破特攻', err: '能量恢復效率', physDmg: '物理增傷', iceDmg: '冰增傷', fireDmg: '火增傷', imagDmg: '虛數增傷', windDmg: '風增傷', spaceDmg: '空增傷', luckDmg: '運增傷',
+    be: '攻擊%（舊・擊破特攻）', err: '能量恢復效率', physDmg: '物理增傷', iceDmg: '冰增傷', fireDmg: '火增傷', imagDmg: '虛數增傷', windDmg: '風增傷', spaceDmg: '空增傷', luckDmg: '運增傷',
     waterDmg: '水增傷', thunderDmg: '雷增傷', grassDmg: '草增傷', sorrowDmg: '哀增傷',
   };
   const FLAT = new Set(['hpFlat', 'atkFlat', 'defFlat', 'spd']);
@@ -28,7 +28,7 @@ const Relics = (() => {
   // 主詞條滿級（+15）數值
   const MAIN = {
     hpFlat: 705.6, atkFlat: 352.8, hpPct: 43.2, atkPct: 43.2, defPct: 54, cr: 32.4, cd: 64.8, ehr: 43.2,
-    spd: 25, physDmg: 38.9, iceDmg: 38.9, fireDmg: 38.9, imagDmg: 38.9, windDmg: 38.9, spaceDmg: 38.9, luckDmg: 38.9, waterDmg: 38.9, thunderDmg: 38.9, grassDmg: 38.9, sorrowDmg: 38.9, be: 64.8, err: 19.4,
+    spd: 25, physDmg: 38.9, iceDmg: 38.9, fireDmg: 38.9, imagDmg: 38.9, windDmg: 38.9, spaceDmg: 38.9, luckDmg: 38.9, waterDmg: 38.9, thunderDmg: 38.9, grassDmg: 38.9, sorrowDmg: 38.9, err: 19.4,
   };
   const SLOT_MAIN = {
     head: ['hpFlat'],
@@ -36,12 +36,12 @@ const Relics = (() => {
     body: ['hpPct', 'atkPct', 'defPct', 'cr', 'cd', 'ehr'],
     feet: ['hpPct', 'atkPct', 'defPct', 'spd'],
     sphere: ['hpPct', 'atkPct', 'defPct', 'physDmg', 'fireDmg', 'waterDmg', 'iceDmg', 'windDmg', 'luckDmg', 'spaceDmg', 'sorrowDmg'],
-    rope: ['hpPct', 'atkPct', 'defPct', 'be', 'err'],
+    rope: ['hpPct', 'atkPct', 'defPct', 'err'],
   };
   // 副詞條單次數值
   const SUB = {
     hpFlat: 38.1, atkFlat: 19.05, defFlat: 19.05, hpPct: 3.89, atkPct: 3.89, defPct: 4.86,
-    spd: 2.3, cr: 2.92, cd: 5.83, ehr: 3.89, effRes: 3.89, be: 5.83,
+    spd: 2.3, cr: 2.92, cd: 5.83, ehr: 3.89, effRes: 3.89,
   };
 
   // 範例套裝（2 件的靜態數值寫在 p2 / p4；條件效果在 engine.js 以 hasSet() 判斷）
@@ -52,20 +52,34 @@ const Relics = (() => {
       p4txt: '追加攻擊造成的傷害提高 20%。施放終結技後，暴擊率提高 12%，持續 2 回合。' },
     contract:  { kind: 'relic',  name: '代理人的委任狀', p2: { spdPct: 6 }, p2txt: '速度提高 6%。',
       p4txt: '施放戰技後，使我方全體攻擊力提高 8%，持續 2 回合。' },
-    scorch:    { kind: 'relic',  name: '焦土狙擊手',     p2: { be: 16 }, p2txt: '擊破特攻提高 16%。',
-      p4: { be: 16 }, p4txt: '擊破特攻再提高 16%。穿戴者投入的餘料參與兌現匣的兌現後，擊破特攻額外提高 20%，持續 2 回合。' },
+    scorch:    { kind: 'relic',  name: '焦土狙擊手',     p2: { atkPct: 12 }, p2txt: '攻擊力提高 12%。',
+      p4: { atkPct: 12 }, p4txt: '攻擊力再提高 12%。穿戴者投入的餘料參與兌現匣的兌現後，攻擊力額外提高 15%，持續 2 回合。' },
     ledger:    { kind: 'relic',  name: '冰封的帳簿',     p2: { iceDmg: 10 }, p2txt: '冰屬性傷害提高 10%。',
       p4txt: '施放終結技時，使我方全體暴擊傷害提高 16%，持續 2 回合。' },
     neon:      { kind: 'planar', name: '霓虹不夜街', p2: { atkPct: 12 },
       p2txt: '攻擊力提高 12%。當速度大於等於 120 時，攻擊力額外提高 12%。' },
     auction:   { kind: 'planar', name: '地下拍賣行', p2: { cr: 8 },
       p2txt: '暴擊率提高 8%。當暴擊率大於等於 70% 時，普攻與戰技造成的傷害提高 20%。' },
-    steel:     { kind: 'planar', name: '鋼骨防線',   p2: { be: 16 },
-      p2txt: '擊破特攻提高 16%。提供的護盾量提高 10%。' },
+    steel:     { kind: 'planar', name: '鋼骨防線',   p2: { atkPct: 12 },
+      p2txt: '攻擊力提高 12%。提供的護盾量提高 10%。' },
     tower:     { kind: 'planar', name: '契約之塔',   p2: { err: 5 },
       p2txt: '能量恢復效率提高 5%。穿戴者在場時，我方全體攻擊力提高 8%（同名效果不疊加）。' },
   };
 
+  /** 擊破特攻已失效：舊妙具的擊破特攻詞條改為攻擊力%（主詞條直接替換；副詞條與既有攻擊% 合併，主詞條就是攻擊% 時改為暴擊率） */
+  function migrateItem(it) {
+    if (!it) return it;
+    if (it.main === 'be') it.main = 'atkPct';
+    const subs = [];
+    (it.subs || []).forEach(sb => {
+      if (sb.stat !== 'be') { subs.push(sb); return; }
+      const to = it.main === 'atkPct' ? 'cr' : 'atkPct', same = subs.find(x => x.stat === to) || (it.subs || []).find(x => x.stat === to && x !== sb);
+      if (same) same.rolls = Math.min(6, (+same.rolls || 0) + (+sb.rolls || 0));
+      else subs.push({ stat: to, rolls: sb.rolls });
+    });
+    it.subs = subs.filter((x, j) => subs.indexOf(x) === j);
+    return it;
+  }
   function P(set, main, subs) {
     return { set, main, level: 15, subs: subs.split(' ').map(s => { const [stat, r] = s.split(':'); return { stat, rolls: +r }; }) };
   }
@@ -96,12 +110,12 @@ const Relics = (() => {
       rope:   P('tower',    'err',     'spd:2 hpPct:2 defPct:2 effRes:2'),
     },
     alan: {
-      head:   P('scorch', 'hpFlat',   'be:3 spd:2 atkPct:2 defPct:1'),
-      hands:  P('scorch', 'atkFlat',  'be:3 spd:2 atkPct:2 hpPct:1'),
-      body:   P('scorch', 'atkPct',   'be:3 spd:2 defPct:2 effRes:1'),
-      feet:   P('scorch', 'spd',      'be:3 atkPct:2 defPct:2 hpPct:1'),
-      sphere: P('steel',  'fireDmg',  'be:3 spd:2 atkPct:2 hpFlat:1'),
-      rope:   P('steel',  'be',       'spd:3 atkPct:2 defPct:2 effRes:1'),
+      head:   P('scorch', 'hpFlat',   'atkPct:3 spd:2 cr:2 defPct:1'),
+      hands:  P('scorch', 'atkFlat',  'atkPct:3 spd:2 cr:2 hpPct:1'),
+      body:   P('scorch', 'atkPct',   'cr:3 spd:2 defPct:2 effRes:1'),
+      feet:   P('scorch', 'spd',      'atkPct:3 cr:2 defPct:2 hpPct:1'),
+      sphere: P('steel',  'fireDmg',  'atkPct:3 spd:2 cr:2 hpFlat:1'),
+      rope:   P('steel',  'atkPct',   'spd:3 cr:2 defPct:2 effRes:1'),
     },
     gordon: {
       head:   P('contract', 'hpFlat',  'spd:2 atkPct:3 cr:2 hpPct:1'),
@@ -192,7 +206,7 @@ const Relics = (() => {
     const counts = {};
     if (loadout) {
       SLOTS.forEach(s => {
-        const p = loadout[s.key];
+        const p = migrateItem(loadout[s.key]);
         if (!p) return;
         if (p.main && SLOT_MAIN[s.key].includes(p.main)) add(p.main, mainValue(p.main, p.level));
         (p.subs || []).slice(0, 4).forEach(sb => {
@@ -245,6 +259,6 @@ const Relics = (() => {
 
   return {
     SLOTS, SLOT_NAME, KIND_NAME, STAT_LABEL, MAIN, SLOT_MAIN, SUB, SETS, DEFAULTS, FLAT,
-    mainValue, genItem, levelUp, upgradeCost, salvageValue, sum, compute, fmtStat,
+    mainValue, genItem, levelUp, upgradeCost, salvageValue, sum, compute, fmtStat, migrateItem,
   };
 })();

@@ -47,9 +47,9 @@ const Quotes = (() => {
     lastCover: {
       name: '掩護到最後一刻', rarity: 4, path: '穩', power: '本質', hp: 953, atk: 423, def: 463,
       skill: '撐住', pskill: '不退讓',
-      stat: r => ({ be: L(28, 56, r) }),
-      val: r => ({ be: L(28, 56, r), sh: L(10, 20, r), red: L(10, 20, r) }),
-      desc(r) { const v = this.val(r); return `使裝備者的擊破特攻提高 ${n(v.be)}%。裝備者提供的護盾量提高 ${n(v.sh)}%。`; },
+      stat: r => ({ atkPct: L(16, 32, r) }),
+      val: r => ({ atk: L(16, 32, r), sh: L(10, 20, r), red: L(10, 20, r) }),
+      desc(r) { const v = this.val(r); return `使裝備者的攻擊力提高 ${n(v.atk)}%。裝備者提供的護盾量提高 ${n(v.sh)}%。`; },
       pdesc(r) { const v = this.val(r); return `裝備者投入的餘料參與「兌現匣」的兌現後，我方全體受到的傷害降低 ${n(v.red)}%，持續 2 回合。`; },
     },
     noAnswer: {
