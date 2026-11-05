@@ -128,5 +128,37 @@ test('Empty and solid Kane markers use one glyph and one enemy icon, including m
   assert.ok(b.run("statusChip('flagrant','現行犯',{solid:true})").includes('solid-mark'));
   assert.equal(b.run('SPECIAL_ST.peek[0]'),b.run('SPECIAL_ST.flagrant[0]'));
 });
+function readyLoom(b){ b.s.loom={tasks:[],charge:1,market:0,hist:[0],gordon:false,buque:false}; }
+test('Loom fires during skill selection without changing turn or selected actor',()=>{
+  const b=setup(['hanye']);readyLoom(b);const turn=b.s.turnNo,time=b.s.time,id=b.s.current;
+  b.run('fireLoom()');assert.equal(b.s.loom.charge,0);assert.equal(b.s.turnNo,turn);assert.equal(b.s.time,time);assert.equal(b.s.current,id);b.tickAll();assert.equal(b.s.phase,'input');
+});
+test('Loom queues through real DoT playback before the pending enemy attack',()=>{
+  const b=setup(['longzhao']);readyLoom(b);b.e.av=0;b.E.act('skill');b.E.drainEvents();b.run('run(()=>Engine.proceed())');
+  assert.equal(b.s.turnWindow.stage,'enemy');b.run('fireLoom()');assert.equal(b.run('loomQueued'),true);assert.equal(b.s.loom.charge,1);
+  b.tickAll();const f=b.presented,di=f.findIndex(x=>x.kind==='dot'),li=f.findIndex(x=>x.kind==='loomRun'),ei=f.findIndex(x=>x.kind==='dmg'&&x.src===b.e.id);
+  assert.ok(di>=0&&li>di&&ei>li);assert.equal(b.run('loomQueued'),false);
+});
+test('Loom confirmed during attack playback runs before the next turn',()=>{
+  const b=setup(['hanye']);readyLoom(b);b.run("run(()=>Engine.act('basic'))");const turn=b.s.turnNo,charge=b.s.loom.charge;assert.equal(b.s.turnWindow.stage,'after');
+  b.run('fireLoom()');assert.equal(b.s.loom.charge,charge);b.tickAll();const log=b.s.log,li=log.findIndex(x=>x.text.includes('時間織機 啟動'));
+  assert.ok(li>log.findIndex(x=>x.type==='act'));assert.ok(li<log.findIndex(x=>x.type==='turn'));assert.ok(b.s.turnNo>turn);
+});
+for(const first of ['loom','ult'])test('Loom and ultimate obey confirmation order: '+first+' first',()=>{
+  const b=setup(['hanye']);readyLoom(b);b.a.energy=b.a.maxEnergy;b.ctx.actor=b.a.id;b.run('playing=true');
+  b.run(first==='loom'?'fireLoom();armed=actor;fireUlt()':'armed=actor;fireUlt();fireLoom()');
+  assert.equal(b.s.loom.charge,1);b.run('playing=false;pump()');b.tickAll();const f=b.presented.filter(x=>x.kind==='loomRun'||x.kind==='ult');assert.deepEqual(f.map(x=>x.kind),first==='loom'?['loomRun','ult']:['ult','loomRun']);
+});
+test('Second loom press cancels reservation without spending charge',()=>{
+  const b=setup(['hanye']);readyLoom(b);b.run('playing=true;fireLoom();fireLoom()');assert.equal(b.run('loomQueued'),false);assert.equal(b.run('insertOrder.length'),0);assert.equal(b.s.loom.charge,1);
+});
+test('Loom cannot queue before displayed charge reaches full',()=>{
+  const b=setup(['hanye']);readyLoom(b);b.run('playing=true;V={loom:{charge:.5}};fireLoom()');assert.equal(b.run('loomQueued'),false);
+});
+test('Spent or missing loom and cleared battle cannot leave stale reservations',()=>{
+  const b=setup(['hanye']);readyLoom(b);b.run('playing=true;fireLoom()');b.s.loom.charge=0;b.run('playing=false;pump()');assert.equal(b.run('loomQueued'),false);assert.equal(b.run('insertOrder.length'),0);
+  b.run("loomQueued=true;ultQueue=['old'];insertOrder=['loom','old'];clearInsertQueue()");assert.equal(b.run('loomQueued'),false);assert.equal(b.run('ultQueue.length+insertOrder.length'),0);
+});
+
 if(process.argv[2])fs.writeFileSync(process.argv[2],JSON.stringify(fixtures));
 console.log(checks+' turn-window/proxy/marker checks passed');

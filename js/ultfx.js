@@ -11,6 +11,7 @@
  *   馬克「盈科後進」                 一排逐級下降的石窪 → 水把每一窪注滿才溢向下一窪（盈）→ 最後一窪滿溢、分流衝向敵人 → 浪花 → 實戰演練印章
  *   O.T.G.「神不在的滿月」          仰望血色滿月 → 身上的裂口撕下、飛向敵人刻成「原罪」→ 月蝕 → 全部引爆 → 倒置十字「瀆神之軀」
  *   米勒「願你安息，願我銘記」       雨中撐傘走來 → 黑傘在敵人上方張開、花瓣盤旋 → 收傘、罌粟與白菊落下 → 葬禮法陣與悲悼階段 → 訃告印
+ *   默冬章「十九個冬天以後是十九個春天」 雪夜裡錶盤點亮 19 個冬 → 齒輪疾轉、月相輪轉，冬翻成春、雪化成花 → 19 道時光 → 春花綻開、冬去春來銅印
  * 英文台詞以字幕呈現（不發聲）。
  * UltFx.play(key, { targets:[{x,y}], src:{x,y}, k, onSkip }) → 回傳演出長度（毫秒）
  * 點擊畫面、Esc 或空白鍵可跳過。
@@ -720,7 +721,7 @@ const UltFx = (() => {
       const ax = lerp(-vw * 0.15, vw * 0.3, ap) - aout * vw * 0.4, ay = vh * 0.24;
       drawArt(c, s.A, ax, ay, ap * (1 - aout) * out);
       if (s.A && s.A2 && ap * (1 - aout) > 0.05) {
-        const lx = ax - (s.A.fx - (60 + 0.36 * (s.A.w - 120))), ly = ay - (s.A.fy - (60 + 0.39 * (s.A.h - 120)));   // 燈條在原圖約 (36%, 39%)
+        const lx = ax - (s.A.fx - (60 + 0.77 * (s.A.w - 120))), ly = ay - (s.A.fy - (60 + 0.378 * (s.A.h - 120)));   // 燈條在新立繪約 (77%, 38%)，車頂右側
         glowDot(c, lx - vh * 0.05, ly, vh * 0.12, 'rgba(255,50,70,.9)', ap * (1 - aout) * out * sr);
         glowDot(c, lx + vh * 0.06, ly, vh * 0.12, 'rgba(60,120,255,.9)', ap * (1 - aout) * out * (1 - sr));
       }
@@ -1620,7 +1621,123 @@ const UltFx = (() => {
     shake: [[1380, 400, 3], [1780, 420, 24], [1880, 200, 8]],
   };
 
-  const SCENES = { kane: KANE, longzhao: LONGZHAO, mocha: MOCHA, alan: ALAN, alexandra: ALEX, hanye: HANYE, gordon: GORDON, mark: MARK, miller: MILLER, otg: OTG, raiden: RAIDEN };
+  /* ================= 默冬章「十九個冬天以後是十九個春天」 =================
+   * 雪夜中，安提基特拉機械的錶盤一格格點亮 19 個冬 → 齒輪疾轉、月相輪轉，19 格冬依序翻成春、雪化成花瓣
+   * → 錶盤射出 19 道時光（命中）→ 春花在每個敵人身上綻開，「冬去春來」的銅印落下 */
+  function metGear(c, x, y, r, teeth, rot, col, alpha, lw) {
+    if (alpha <= 0 || r <= 0) return;
+    c.save(); c.globalAlpha = Math.min(1, alpha); c.translate(x, y); c.rotate(rot);
+    c.strokeStyle = col; c.lineWidth = lw || 2;
+    c.beginPath();
+    for (let i = 0; i <= teeth * 2; i++) { const a = i / (teeth * 2) * TAU, rr = i % 2 ? r : r * 0.9; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    c.closePath(); c.stroke();
+    c.beginPath(); c.arc(0, 0, r * 0.62, 0, TAU); c.stroke();
+    for (let i = 0; i < 4; i++) { const a = i / 4 * TAU; c.beginPath(); c.moveTo(Math.cos(a) * r * 0.16, Math.sin(a) * r * 0.16); c.lineTo(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62); c.stroke(); }
+    c.beginPath(); c.arc(0, 0, r * 0.16, 0, TAU); c.stroke();
+    c.restore();
+  }
+  /** 月相：phase 0＝新月 → 0.5＝滿月 → 1＝新月 */
+  function metMoon(c, x, y, r, phase, alpha) {
+    if (alpha <= 0) return;
+    c.save(); c.globalAlpha = Math.min(1, alpha);
+    glowDot(c, x, y, r * 2.4, 'rgba(220,226,255,.22)', 1);
+    c.fillStyle = '#20243c'; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    const lit = Math.cos(phase * TAU), waxing = phase < 0.5;
+    c.fillStyle = '#eef1ff'; c.beginPath();
+    c.arc(x, y, r, -Math.PI / 2, Math.PI / 2, !waxing);
+    c.ellipse(x, y, r * Math.abs(lit), r, 0, Math.PI / 2, -Math.PI / 2, lit > 0 ? waxing : !waxing);   // 未過半＝月牙（內凹）、過半＝凸月
+    c.fill();
+    c.restore();
+  }
+  const METONIC = {
+    setup(s) {
+      const R = s.R, vw = s.vw, vh = s.vh;
+      s.A = prepArt(s, vh * 1.22, 'rgba(216,187,140,.45)', 'contrast(1.05) saturate(1.05)');
+      s.dial = { x: vw * 0.66, y: vh * 0.42, r: Math.min(vw, vh) * 0.27 };
+      s.snow = Array.from({ length: 120 }, () => ({ x: R() * vw * 1.2 - vw * 0.1, o: R() * 3000, v: 0.05 + R() * 0.08, sz: 1 + R() * 3, sw: R() * TAU, k: R() < 0.5 ? 0 : 1, rot: R() * TAU }));
+      s.bloom = s.tg.map(() => Array.from({ length: 10 }, (_, i) => ({ a: i / 10 * TAU + R() * 0.4, d: 20 + R() * 60, k: i % 2, s: 7 + R() * 9, dl: R() * 160 })));
+    },
+    draw(c, t, s) {
+      const { vw, vh } = s, D = s.dial, out = 1 - prog(t, 2450, 2800);
+      const spring = eio(prog(t, 750, 1500));   // 冬 → 春
+      // 夜空：由冬夜的深藍漸漸轉暖
+      c.fillStyle = `rgba(${Math.round(lerp(8, 24, spring))},${Math.round(lerp(12, 16, spring))},${Math.round(lerp(28, 30, spring))},${0.95 * eo(prog(t, 0, 220)) * out})`; c.fillRect(0, 0, vw, vh);
+      glowDot(c, D.x, D.y, D.r * 2.6, spring > 0.5 ? 'rgba(255,190,210,.16)' : 'rgba(150,180,255,.16)', out);
+      // 雪 → 花瓣：同一批粒子在轉換時換成罌粟／白菊般的春花
+      s.snow.forEach(p => {
+        const y = ((t * p.v * (1 + spring * 1.6) + p.o) % (vh + 80)) - 40, x = p.x + Math.sin(t * 0.002 + p.sw) * 20 + spring * t * 0.05;
+        const a = out * (0.35 + 0.5 * prog(t, 0, 300));
+        if (spring < 0.5) { c.globalAlpha = a * (1 - spring * 2); c.fillStyle = '#e8efff'; c.beginPath(); c.arc(x % (vw + 40), y, p.sz, 0, TAU); c.fill(); c.globalAlpha = 1; }
+        else flower(c, x % (vw + 40), y, p.sz * 2.4, p.k, p.rot + t * 0.003, a * (spring - 0.5) * 2);
+      });
+      // 立繪：從左側走入，冬的冷光 → 春的暖光
+      const ap = eo(prog(t, 60, 600)), aout = eio(prog(t, 1450, 1750));
+      drawArt(c, s.A, lerp(-vw * 0.08, vw * 0.22, ap) - aout * vw * 0.3, vh * 0.3, ap * (1 - aout) * out * 0.95);
+      // 安提基特拉機械：大齒輪、兩個小齒輪，轉速隨轉換加快
+      const ga = out * eo(prog(t, 120, 520)) * (1 - prog(t, 2150, 2450) * 0.7), spin = t * 0.0006 + eio(prog(t, 700, 1600)) * 6;
+      const bronze = spring > 0.5 ? '#f0d8a8' : '#c9b48a';
+      metGear(c, D.x, D.y, D.r, 38, spin, bronze, ga * 0.9, 2.5);
+      metGear(c, D.x - D.r * 0.92, D.y + D.r * 0.72, D.r * 0.36, 16, -spin * 2.4, bronze, ga * 0.7, 2);
+      metGear(c, D.x + D.r * 0.98, D.y - D.r * 0.64, D.r * 0.28, 12, -spin * 3.1, bronze, ga * 0.7, 2);
+      // 錶盤上的 19 格：0～700 依序點亮成冬（冷藍），750～1500 依序翻成春（粉紅）
+      for (let i = 0; i < 19; i++) {
+        const a = i / 19 * TAU - Math.PI / 2, x = D.x + Math.cos(a) * D.r * 0.78, y = D.y + Math.sin(a) * D.r * 0.78;
+        const on = prog(t, 120 + i * 28, 200 + i * 28), sp = prog(t, 760 + i * 36, 840 + i * 36);
+        if (on <= 0) continue;
+        const col = sp > 0.5 ? '#ffb8d0' : '#a9c4ff';
+        glowDot(c, x, y, 16, col, ga * on * (0.6 + 0.4 * bump(t, 800 + i * 36, 80)));
+        c.save(); c.globalAlpha = ga * on; c.fillStyle = col; c.beginPath(); c.arc(x, y, 4 + sp * 2, 0, TAU); c.fill(); c.restore();
+      }
+      // 月相：錶盤中央的月亮快速輪轉（235 個朔望月的意象），停在滿月
+      const ph = t < 700 ? 0.08 + t * 0.0002 : t < 1500 ? (0.22 + eio(prog(t, 700, 1500)) * 4.28) % 1 : 0.5;
+      metMoon(c, D.x, D.y, D.r * 0.28, ph, ga);
+      if (t < 1500 && ga > 0) label(c, String(Math.min(19, Math.floor(prog(t, 120, 650) * 19 + (t > 120 ? 1 : 0)))), D.x, D.y + D.r * 0.47, vh * 0.04, spring > 0.5 ? '#ffd8e4' : '#dce6ff', ga * (1 - prog(t, 1300, 1500)), 'center', SERIF);
+      // 標題（左上）
+      const ta = (1 - prog(t, 1500, 1750)) * out;
+      if (ta > 0) {
+        label(c, '默冬章 ─ 安提基特拉機械', vw * 0.27, vh * 0.16, vh * 0.024, '#e6cf9e', ta * prog(t, 150, 400), 'center', SANS, 8);
+        title(c, '十九個冬天', vw * 0.27, vh * 0.27, vh * 0.085, { t, start: 200, per: 70, align: 'center', alpha: ta, glow: 'rgba(150,180,255,.7)', fill: { grad: [[0, '#ffffff'], [0.6, '#d6e2ff'], [1, '#8ea6d8']] }, spacing: vh * 0.008 });
+        title(c, '以後是十九個春天', vw * 0.27, vh * 0.38, vh * 0.07, { t, start: 780, per: 60, align: 'center', alpha: ta, glow: 'rgba(255,170,200,.7)', fill: { grad: [[0, '#ffffff'], [0.6, '#ffe0ea'], [1, '#d88aa8']] }, spacing: vh * 0.006 });
+      }
+      quote(c, s, 'Nineteen winters…', vw * 0.05, vh * 0.88, t, 250, 1100, { fill: '#e2e9ff', glow: 'rgba(150,180,255,.6)' });
+      // 19 道時光從錶盤射向敵人（1550～1820）
+      if (t > 1500 && t < 2100) s.tg.forEach((p, i) => {
+        for (let j = 0; j < 19; j++) {
+          if (j % s.tg.length !== i % s.tg.length && s.tg.length > 1) continue;
+          const a = j / 19 * TAU - Math.PI / 2, sx = D.x + Math.cos(a) * D.r * 0.78, sy = D.y + Math.sin(a) * D.r * 0.78;
+          const q = eio(prog(t, 1550 + j * 10, 1820)), fade = 1 - prog(t, 1850, 2100);
+          if (q <= 0) continue;
+          const ex = lerp(sx, p.x, q), ey = lerp(sy, p.y, q);
+          c.save(); c.globalAlpha = out * fade * 0.9; c.strokeStyle = j % 2 ? '#ffd0e0' : '#f0d8a8'; c.lineWidth = 3; c.shadowColor = '#ffd8a0'; c.shadowBlur = 12;
+          c.beginPath(); c.moveTo(lerp(sx, ex, 0.55), lerp(sy, ey, 0.55)); c.lineTo(ex, ey); c.stroke(); c.restore();
+        }
+      });
+      flash(c, s, '#fff4e0', 0.6 * bump(t, 1820, 200));
+      // 春花在每個敵人身上綻開
+      if (t > 1820) s.tg.forEach((p, i) => {
+        glowDot(c, p.x, p.y, 120, 'rgba(255,190,210,.4)', out * bump(t, 1860, 260));
+        s.bloom[i].forEach(b => {
+          const q = eo(prog(t, 1820 + b.dl, 2150 + b.dl));
+          if (q <= 0) return;
+          flower(c, p.x + Math.cos(b.a) * b.d * q, p.y + Math.sin(b.a) * b.d * q * 0.7 - q * 20, b.s * (0.6 + q * 0.6), b.k, b.a + t * 0.002, out * (1 - prog(t, 2300 + b.dl * 0.5, 2600)));
+        });
+      });
+      // 「冬去春來」的銅印
+      if (t >= 2050) {
+        const p = prog(t, 2050, 2140), k = lerp(2.3, 1, eo(p)), a = Math.min(1, p * 3) * out;
+        c.save(); c.globalAlpha = a; c.translate(vw * 0.8, vh * 0.68); c.rotate(-0.1); c.scale(k, k);
+        c.fillStyle = 'rgba(40,30,20,.88)'; c.beginPath(); c.arc(0, 0, 70, 0, TAU); c.fill();
+        c.strokeStyle = '#e6cf9e'; c.lineWidth = 5; c.stroke(); c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, 58, 0, TAU); c.stroke();
+        c.fillStyle = '#f4e6c8'; c.font = `900 30px ${SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('冬去', 0, -15); c.fillStyle = '#ffc8da'; c.fillText('春來', 0, 20);
+        c.restore();
+      }
+      quote(c, s, '…then nineteen springs.', vw * 0.94, vh * 0.86, t, 1900, 2650, { align: 'right', fill: '#ffffff', glow: 'rgba(255,170,200,.6)', dx: -30 });
+      vignette(c, s, 'rgba(6,6,14,.94)', 0.7 * out);
+    },
+    shake: [[1820, 380, 16], [2080, 160, 6]],
+  };
+
+  const SCENES = { metonic: METONIC, kane: KANE, longzhao: LONGZHAO, mocha: MOCHA, alan: ALAN, alexandra: ALEX, hanye: HANYE, gordon: GORDON, mark: MARK, miller: MILLER, otg: OTG, raiden: RAIDEN };
 
   /* ================= 播放控制 ================= */
   function play(key, o) {

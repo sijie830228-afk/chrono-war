@@ -21,21 +21,21 @@ const Relics = (() => {
     hpFlat: '生命', atkFlat: '攻擊力', defFlat: '防禦', hpPct: '生命%', atkPct: '攻擊%', defPct: '防禦%',
     spd: '速度', spdPct: '速度%', cr: '暴擊率', cd: '暴擊傷害', ehr: '效果命中', effRes: '效果抵抗',
     be: '攻擊%（舊・擊破特攻）', err: '能量恢復效率', physDmg: '物理增傷', iceDmg: '冰增傷', fireDmg: '火增傷', imagDmg: '虛數增傷', windDmg: '風增傷', spaceDmg: '空增傷', luckDmg: '運增傷',
-    waterDmg: '水增傷', thunderDmg: '雷增傷', grassDmg: '草增傷', sorrowDmg: '哀增傷',
+    waterDmg: '水增傷', thunderDmg: '雷增傷', grassDmg: '草增傷', sorrowDmg: '哀增傷', timeDmg: '時增傷',
   };
   const FLAT = new Set(['hpFlat', 'atkFlat', 'defFlat', 'spd']);
 
   // 主詞條滿級（+15）數值
   const MAIN = {
     hpFlat: 705.6, atkFlat: 352.8, hpPct: 43.2, atkPct: 43.2, defPct: 54, cr: 32.4, cd: 64.8, ehr: 43.2,
-    spd: 25, physDmg: 38.9, iceDmg: 38.9, fireDmg: 38.9, imagDmg: 38.9, windDmg: 38.9, spaceDmg: 38.9, luckDmg: 38.9, waterDmg: 38.9, thunderDmg: 38.9, grassDmg: 38.9, sorrowDmg: 38.9, err: 19.4,
+    spd: 25, physDmg: 38.9, iceDmg: 38.9, fireDmg: 38.9, imagDmg: 38.9, windDmg: 38.9, spaceDmg: 38.9, luckDmg: 38.9, waterDmg: 38.9, thunderDmg: 38.9, grassDmg: 38.9, sorrowDmg: 38.9, timeDmg: 38.9, err: 19.4,
   };
   const SLOT_MAIN = {
     head: ['hpFlat'],
     hands: ['atkFlat'],
     body: ['hpPct', 'atkPct', 'defPct', 'cr', 'cd', 'ehr'],
     feet: ['hpPct', 'atkPct', 'defPct', 'spd'],
-    sphere: ['hpPct', 'atkPct', 'defPct', 'physDmg', 'fireDmg', 'waterDmg', 'iceDmg', 'windDmg', 'luckDmg', 'spaceDmg', 'sorrowDmg'],
+    sphere: ['hpPct', 'atkPct', 'defPct', 'physDmg', 'fireDmg', 'waterDmg', 'iceDmg', 'windDmg', 'luckDmg', 'spaceDmg', 'sorrowDmg', 'timeDmg'],
     rope: ['hpPct', 'atkPct', 'defPct', 'err'],
   };
   // 副詞條單次數值
@@ -148,6 +148,14 @@ const Relics = (() => {
       feet:   P('ironfist', 'atkPct',   'ehr:2 spd:2 hpPct:3 effRes:1'),
       sphere: P('neon',     'physDmg',  'atkPct:3 ehr:2 spd:2 hpFlat:1'),
       rope:   P('neon',     'atkPct',   'ehr:3 spd:2 hpPct:2 defPct:1'),
+    },
+    metonic: {
+      head:   P('detective', 'hpFlat',  'cr:3 cd:2 atkPct:2 spd:1'),
+      hands:  P('detective', 'atkFlat', 'cr:3 cd:2 atkPct:2 spd:1'),
+      body:   P('detective', 'cd',      'cr:3 atkPct:2 spd:2 hpPct:1'),
+      feet:   P('detective', 'spd',     'cr:3 cd:2 atkPct:2 hpPct:1'),
+      sphere: P('auction',   'timeDmg', 'cr:3 cd:2 atkPct:2 spd:1'),
+      rope:   P('auction',   'atkPct',  'cr:3 cd:2 spd:2 hpPct:1'),
     },
     miller: {
       head:   P('ironfist', 'hpFlat',   'hpPct:3 ehr:3 defPct:1 effRes:1'),

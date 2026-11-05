@@ -26,6 +26,7 @@ const Meta = (() => {
     hanye:    { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 28 }, { stat: 'cd', v: 24 }, { stat: 'defPct', v: 12.5 }] },
     otg:      { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 28 }, { stat: 'ehr', v: 18 }, { stat: 'hpPct', v: 10 }] },
     miller:   { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'hpPct', v: 28 }, { stat: 'ehr', v: 18 }, { stat: 'spd', v: 5 }] },
+    metonic:  { skills: '普攻 Lv.6 · 戰技 Lv.10 · 終結技 Lv.10 · 天賦 Lv.10', nodes: [{ stat: 'atkPct', v: 28 }, { stat: 'cr', v: 12 }, { stat: 'spd', v: 5 }] },
   };
 
   /* ---------- 副本 ---------- */
@@ -64,7 +65,7 @@ const Meta = (() => {
       std5: [{ kind: 'char', id: 'mocha' }], rate5: 0.006, soft: 74, hard: 90, win: 0.5 },
     lc: { name: '金句活動躍遷「罪證確鑿」', type: 'lc', up5: { kind: 'lc', id: 'irrefutable' },
       up4: [{ kind: 'lc', id: 'ninthRule' }, { kind: 'lc', id: 'clause7' }, { kind: 'lc', id: 'lastCover' }],
-      std5: [{ kind: 'lc', id: 'leverage' }, { kind: 'lc', id: 'greenWave' }, { kind: 'lc', id: 'noAnswer' }], rate5: 0.008, soft: 66, hard: 80, win: 0.75 },
+      std5: [{ kind: 'lc', id: 'leverage' }, { kind: 'lc', id: 'greenWave' }, { kind: 'lc', id: 'noAnswer' }, { kind: 'lc', id: 'sameMoon' }], rate5: 0.008, soft: 66, hard: 80, win: 0.75 },
   };
   const POOL4 = [{ kind: 'char', id: 'longzhao' }, { kind: 'char', id: 'alan' },
     { kind: 'lc', id: 'ninthRule' }, { kind: 'lc', id: 'clause7' }, { kind: 'lc', id: 'lastCover' },
@@ -72,7 +73,7 @@ const Meta = (() => {
   const POOL3 = ['firstClue', 'blankCheck', 'smallTalk', 'silentGold', 'trafficLight', 'domain', 'obituary'].map(id => ({ kind: 'lc', id }));
 
   // 專屬金句：存檔裡還沒有時送一把，並在角色沒有裝備金句時替他裝上
-  const SIGNATURE = { gordon: 'leverage', alexandra: 'greenWave', mark: 'internNotes', hanye: 'uniqueSolution', miller: 'bouquetForYou', otg: 'noAnswer' };
+  const SIGNATURE = { gordon: 'leverage', alexandra: 'greenWave', mark: 'internNotes', hanye: 'uniqueSolution', miller: 'bouquetForYou', otg: 'noAnswer', metonic: 'sameMoon' };
 
   /* ---------- 存檔 ---------- */
   let S = null;

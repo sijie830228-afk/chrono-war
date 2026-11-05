@@ -60,6 +60,14 @@ const Quotes = (() => {
       desc(r) { const v = this.val(r); return `使裝備者的攻擊力提高 ${n(v.atk)}%。裝備者每承受一次持續傷害，獲得 1 層【受難】，每層使造成的傷害提高 ${n(v.pain)}%，最多疊加 4 層，持續 2 回合。裝備者生命值低於 50% 時，暴擊傷害提高 ${n(v.cd)}%。`; },
       pdesc(r) { const v = this.val(r); return `裝備者投入的餘料參與「兌現匣」的兌現後，受到該次兌現傷害的敵人身上所有「裂傷」立即產生相當於原傷害 ${n(v.echo)}% 的傷害。`; },
     },
+    sameMoon: {
+      name: '十九年後的同一輪月', rarity: 5, path: '境', power: '平衡', sig: 'metonic', hp: 1058, atk: 635, def: 397,
+      skill: '圓缺', pskill: '朔望',
+      stat: r => ({ cd: L(32, 56, r) }),
+      val: r => ({ cd: L(32, 56, r), wane: L(24, 40, r), atk: L(4, 6, r), adv: L(12, 20, r) }),
+      desc(r) { const v = this.val(r); return `使裝備者的暴擊傷害提高 ${n(v.cd)}%。裝備者每發動一次追加攻擊，獲得 1 層【圓缺】，使下一次普攻造成的傷害提高 ${n(v.wane)}%，最多疊加 3 層，施放普攻後移除。`; },
+      pdesc(r) { const v = this.val(r); return `「時間織機」每執行一份［校準任務］，裝備者獲得 1 層【朔望】，每層使攻擊力提高 ${n(v.atk)}%，最多疊加 7 層，持續 2 回合；單次啟動執行 3 份以上的任務時，裝備者行動提前 ${n(v.adv)}%。`; },
+    },
     // ---------- 專屬金句（亞歷山卓、馬克、寒夜、米勒） ----------
     greenWave: {
       name: '一路綠燈', rarity: 5, path: '境', power: '本質', sig: 'alexandra', hp: 1058, atk: 529, def: 463,

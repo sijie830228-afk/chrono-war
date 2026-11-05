@@ -186,7 +186,16 @@ const Sound = (() => {
       tone(1250, t + 0.02, 0.22, 0.05, { type: 'square', filter: 'bandpass', f: 2400, q: 6 });
       noise(t, 0.12, 0.08, { filter: 'lowpass', f: 500 });
     },
-    atk_mocha: t => { [0, 0.055, 0.11].forEach(d => { bell(rnd(2400, 3400), t + d, 0.25, 0.07, { ratio: 2.76, verb: 0.35 }); swish(t + d, 0.08, 6000, 2500, 0.1); }); },
+    // 莫卡兄弟：水管裡的水晃動的悶響（揮動與敲擊另外由 pipeSwing／pipeClang 播放）
+    atk_mocha: t => { noise(t, 0.22, 0.06, { filter: 'lowpass', f: 700, f2: 300, verb: 0.2 }); tone(180, t + 0.02, 0.16, 0.03, { type: 'triangle', f2t: 120 }); },
+    // 沉重的水管掄起來的破風聲
+    pipeSwing: t => { swish(t + 0.05, 0.34, 420, 2000, 0.3, -0.25); swish(t + 0.14, 0.2, 900, 3200, 0.18, 0.25); },
+    // 鏗：鋼管打在身上的金屬聲 + 水花 + 結冰的細碎聲
+    pipeClang: t => {
+      bell(640, t, 0.9, 0.11, { ratio: 1.41, index: 3, verb: 0.35 }); bell(1710, t, 0.5, 0.05, { ratio: 2.73, verb: 0.3 });
+      noise(t, 0.04, 0.3, { filter: 'highpass', f: 2600 }); noise(t + 0.02, 0.2, 0.08, { filter: 'lowpass', f: 1300, f2: 400 });
+      [0.08, 0.13, 0.19].forEach(d => bell(rnd(3000, 4200), t + d, 0.18, 0.025, { ratio: 2.76 }));
+    },
     atk_alan: t => {
       noise(t, 0.07, 0.7, { filter: 'highpass', f: 900, a: 0.001 });
       tone(120, t, 0.3, 0.55, { f2t: 38, gdur: 0.2, a: 0.001 });
@@ -251,6 +260,30 @@ const Sound = (() => {
       kick(t + 0.3, 0.5, sfxBus, { f: 60, f2: 30, dur: 0.3 }); kick(t + 0.55, 0.35, sfxBus, { f: 55, f2: 28, dur: 0.25 });
     },
     // 米勒：黑傘甩開的風聲 + 低沉的喪鐘餘韻
+    // 默冬章：齒輪咬合的輕響 → 七聲由低到高的月光音階
+    atk_metonic: t => { noise(t, 0.05, 0.08, { filter: 'highpass', f: 3200 }); [69, 71, 74, 76, 79, 81, 83].forEach((m, i) => bell(mtof(m), t + 0.04 + i * 0.035, 0.3, 0.025, { ratio: 2.4, verb: 0.4 })); },
+    // 月影：同一套音階，音色更冷、帶回音
+    atk_moon: t => { [81, 79, 76, 74, 71, 69, 67].forEach((m, i) => bell(mtof(m), t + i * 0.035, 0.45, 0.022, { ratio: 3.1, index: 0.6, verb: 0.7 })); },
+    // 金銀光每落下一段：金＝溫暖的鐘、銀＝冷而帶回音；強化普攻兩兩成對，銀比金高五度
+    lightSeg: (t, o) => {
+      const m = [69, 71, 74, 76, 79, 81, 83, 86][(o.seg || 0) % 8] + (o.silver ? 7 : 0);
+      bell(mtof(m), t, o.silver ? 0.45 : 0.32, 0.026, o.silver ? { ratio: 3.1, index: 0.6, verb: 0.7 } : { ratio: 2.4, verb: 0.4 });
+      noise(t, 0.05, 0.02, { filter: 'highpass', f: 6000 });
+    },
+    // 春雷：劈啪的雷擊 → 低沉的雷鳴 → 一串明亮的春日鐘聲
+    springThunder: t => {
+      noise(t, 0.06, 0.4, { filter: 'highpass', f: 2200, a: 0.001 }); tone(2400, t, 0.08, 0.04, { type: 'sawtooth', f2t: 300, filter: 'lowpass', f: 5000 });
+      boom(t + 0.03, 0.4, { f: 70, nf: 1200, dur: 0.8, crackle: 10 });
+      [76, 79, 83, 88].forEach((m, i) => bell(mtof(m), t + 0.12 + i * 0.05, 0.6, 0.022, { ratio: 2, verb: 0.6 }));
+    },
+    // 櫻花盛開：一串上行的五聲音階 + 柔和的氣流
+    sakuraBloom: t => {
+      [72, 74, 76, 79, 81, 84, 88].forEach((m, i) => bell(mtof(m), t + i * 0.045, 0.9, 0.024, { ratio: 2, index: 1.2, verb: 0.75 }));
+      noise(t, 0.6, 0.03, { filter: 'bandpass', f: 3000, f2: 6000, q: 0.8, a: 0.2, verb: 0.5 });
+    },
+    // 月影現身／重逢：玻璃般的和弦
+    moonSummon: t => { [64, 71, 76, 83].forEach((m, i) => bell(mtof(m), t + i * 0.07, 1.0, 0.03, { ratio: 2.76, verb: 0.75 })); },
+    reunite: t => { chord([60, 67, 72, 76], t, 1.2, 0.03, { type: 'triangle', verb: 0.6 }); [84, 88, 91].forEach((m, i) => bell(mtof(m), t + 0.2 + i * 0.08, 0.8, 0.03, { ratio: 2, verb: 0.6 })); },
     atk_miller: t => {
       swish(t, 0.26, 600, 2600, 0.3, -0.2);
       bell(mtof(57), t + 0.12, 1.1, 0.05, { ratio: 1.41, index: 1.1, verb: 0.7 });
@@ -515,6 +548,21 @@ const Sound = (() => {
     noise(t + 1.8 * k, 0.6, 0.2, { f: 1800, f2: 400, q: 0.8, a: 0.004 });
     kick(t + 2.05 * k, 0.75, sfxBus, { f: 90, f2: 28, dur: 0.5 });   // 十字落下
     chord([38, 41, 45, 50], t + 2.08 * k, 1.0, 0.05, { type: 'sawtooth', filter: 'lowpass', f: 1600, f2: 300, verb: 0.6 });
+  };
+  ULT.metonic = (t, k) => {
+    // 雪夜的鐘錶滴答 → 19 格依序點亮（上行音階）→ 齒輪疾轉、冬翻成春（大調和聲）→ 19 道時光命中 → 春花與銅印
+    noise(t, 1.0 * k, 0.04, { filter: 'highpass', f: 5000, a: 0.3 * k, verb: 0.6 });   // 雪夜的風
+    for (let i = 0; i < 19; i++) tone(2400, t + (0.12 + i * 0.028) * k, 0.02, 0.03, { type: 'triangle', pan: Math.sin(i) * 0.5 });   // 錶盤滴答
+    for (let i = 0; i < 8; i++) bell(mtof([62, 64, 66, 69, 71, 74, 76, 78][i]), t + (0.15 + i * 0.07) * k, 0.6, 0.025, { ratio: 2.4, verb: 0.6 });   // 冬的音階（冷）
+    chord([50, 57, 62, 66], t, 1.4 * k, 0.022, { type: 'triangle', a: 0.4 * k, verb: 0.75 });
+    swish(t + 0.75 * k, 0.6, 400, 2600, 0.3 * k, 0);   // 齒輪疾轉
+    for (let i = 0; i < 10; i++) bell(mtof([72, 74, 76, 79, 81, 84, 86, 88, 91, 93][i]), t + (0.78 + i * 0.07) * k, 0.5, 0.025, { ratio: 2, index: 0.5, verb: 0.6, pan: rnd(-0.5, 0.5) });   // 冬翻成春
+    chord([55, 62, 67, 71, 74], t + 0.8 * k, 1.0 * k, 0.03, { type: 'triangle', verb: 0.7 });
+    swish(t + 1.55 * k, 0.3, 600, 3200, 0.25 * k, 0);
+    boom(t + 1.82 * k, 0.6, { f: 70, nf: 1600, dur: 1.0, crackle: 4 });   // 19 道時光命中
+    chord([55, 59, 62, 67, 71], t + 1.85 * k, 1.0, 0.045, { type: 'sawtooth', filter: 'lowpass', f: 2600, f2: 600, verb: 0.7 });
+    [2.0, 2.1, 2.2].forEach((d, i) => bell(mtof(79 + i * 4), t + d * k, 0.7, 0.04, { ratio: 2, verb: 0.6 }));   // 春花
+    kick(t + 2.05 * k, 0.6, sfxBus, { f: 110, f2: 35, dur: 0.4 });   // 銅印
   };
   ULT.miller = (t, k) => {
     // 雨聲 → 三響喪鐘 → 撐傘的風聲 → 收傘 → 花雨落下的低鳴 → 訃告蓋印

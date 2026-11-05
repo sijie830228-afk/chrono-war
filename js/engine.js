@@ -6,9 +6,9 @@
  * ========================================================= */
 
 // 本質：物理、火、水、風、雷、冰、草；平衡：命、運、時、空、律（目前有角色的：運、空）；情感：喜、怒、哀、樂（目前有角色的：哀）；虛數為舊屬性，保留給舊資料
-const ELEM_NAME = { phys: '物理', fire: '火', water: '水', wind: '風', thunder: '雷', ice: '冰', grass: '草', luck: '運', space: '空', joy: '喜', anger: '怒', sorrow: '哀', mirth: '樂', imag: '虛數' };
+const ELEM_NAME = { phys: '物理', fire: '火', water: '水', wind: '風', thunder: '雷', ice: '冰', grass: '草', luck: '運', space: '空', time: '時', joy: '喜', anger: '怒', sorrow: '哀', mirth: '樂', imag: '虛數' };
 const ELEM_KEY = Object.fromEntries(Object.entries(ELEM_NAME).map(([k, v]) => [v, k]));
-const ELEM_BREAK_MULT = { phys: 2, fire: 2, water: 1.5, wind: 1.5, thunder: 1.5, ice: 1, grass: 1.5, luck: 1, space: 1, joy: 1, anger: 1, sorrow: 1, mirth: 1, imag: 1 };
+const ELEM_BREAK_MULT = { phys: 2, fire: 2, water: 1.5, wind: 1.5, thunder: 1.5, ice: 1, grass: 1.5, luck: 1, space: 1, time: 1, joy: 1, anger: 1, sorrow: 1, mirth: 1, imag: 1 };
 const LEVEL_MULT = 3767.5533;   // 80 級擊破基礎係數
 
 // path = 命途（性相），power = 權能（本質／平衡……）
@@ -63,6 +63,11 @@ const CHARS = {
     actions: { basic: '收好，你的訃告', skill: '罌粟與白菊，你喜歡哪一種？', ult: '願你安息，願我銘記' },
     skillTarget: 'enemy', ultTarget: 'all',
   },
+  metonic: {
+    name: '默冬章', rarity: 5, elem: 'time', path: '境', power: '平衡', faction: '無', role: '召喚／協同主C', weapon: '安提基特拉機械',
+    actions: { basic: '七道月光', enhanced: '枯木終逢春', skill: '歧路也有重逢', ult: '十九個冬天以後是十九個春天' },
+    skillTarget: 'none', ultTarget: 'all', ultRes: '冬',
+  },
 };
 
 const ENEMY_TYPES = {
@@ -88,6 +93,7 @@ const DEFAULT_CONFIG = {
     hanye:    { lvl: 80, baseAtk: 620, atkPct: 0, hp: 1050, def: 440, spd: 100, cr: 5, cd: 50, dmgBonus: 0, ehr: 0, effRes: 0, be: 0, err: 100, maxEnergy: 120, startEnergy: 50 },
     otg:      { lvl: 80, baseAtk: 660, atkPct: 0, hp: 1300, def: 500, spd: 98, cr: 5, cd: 50, dmgBonus: 0, ehr: 0, effRes: 0, be: 0, err: 100, maxEnergy: 9, startEnergy: 0 },
     miller:   { lvl: 80, baseAtk: 480, atkPct: 0, hp: 1350, def: 500, spd: 102, cr: 5, cd: 50, dmgBonus: 0, ehr: 0, effRes: 0, be: 0, err: 100, maxEnergy: 120, startEnergy: 50 },
+    metonic:  { lvl: 80, baseAtk: 630, atkPct: 0, hp: 1150, def: 460, spd: 104, cr: 5, cd: 50, dmgBonus: 0, ehr: 0, effRes: 0, be: 0, err: 100, maxEnergy: 19, startEnergy: 0 },
   },
   enemies: [
     { wave: 1, type: 'thug',   name: '第九街打手 A', hp: 40000,  atk: 900,  spd: 100, lvl: 80, tough: 30,  weak: '火,冰',   effRes: 10 },
@@ -118,6 +124,7 @@ const DEFAULT_CONFIG = {
     markTechnique: true,
     millerTechnique: true,
     otgTechnique: true,
+    metonicTechnique: true,
     toughness: false,   // 韌性與弱點擊破（舊機制，目前關閉）
     cashbox: true,      // 本質權能：兌現匣
   },
@@ -226,10 +233,14 @@ const Engine = (() => {
   }
   function rawSpd(u) {
     if (u.side === 'timer') return u.base.spd;
+    if (u.side === 'summon') { const o = U(u.owner); return o ? rawSpd(o) : 100; }
     if (u.side === 'enemy') return u.base.spd * (1 + buffSum(u, 'spdPct'));
     return u.base.spdBase * (1 + u.base.spdPct + buffSum(u, 'spdPct')) + u.base.spdFlat;
   }
-  function getSpd(u) { return modAdd(rawSpd(u), 'spd', u); }
+  function getSpd(u) {
+    if (u.side === 'summon') { const o = U(u.owner); return o ? getSpd(o) : 100; }   // 召喚物（月影）的速度永遠等於召喚者
+    return modAdd(rawSpd(u), 'spd', u);
+  }
   /** 速度改變時等比例調整行動值（當前行動者除外，回合結束時會重置） */
   function syncSpeeds() {
     S.units.forEach(u => {
@@ -304,6 +315,7 @@ const Engine = (() => {
   const SKILL_LOCK = {};
   function canSkillFor(u) {
     if (u && SKILL_LOCK[u.key] && SKILL_LOCK[u.key](u)) return false;
+    if (u && u.freeSkill) return true;   // 默冬章「重逢」：下一次戰技不消耗戰技點
     return S.rules.infiniteSP || S.sp >= 1;
   }
 
@@ -316,11 +328,13 @@ const Engine = (() => {
       u.av = Math.max(0, u.av - p * 10000 / getSpd(u));
       log('buff', `${u.name} 行動提前 ${pct(p)}`, '', { kind: 'av', tgt: u.id, dir: 'up', p });
     }
+    moonFollow(u, p, 'up');   // 默冬章的行動序列改變 → 月影同步
   }
   function delay(u, p) {
     if (!u.alive) return;
     u.av += p * 10000 / getSpd(u);
     log('buff', `${u.name} 行動延後 ${pct(p)}`, '', { kind: 'av', tgt: u.id, dir: 'down', p });
+    moonFollow(u, p, 'down');
   }
 
   function enemyTarget() {
@@ -432,7 +446,7 @@ const Engine = (() => {
     const tail = `${fmt(dmg)} ${ELEM_NAME[o.elem]}傷害${crit ? ' 💥' : ''}${absorbed ? `（護盾吸收 ${fmt(absorbed)}）` : ''}`;
     log(o.dot ? 'dot' : (att.side === 'ally' ? 'dmg' : 'hurt'),
       up ? `${att.name}【${o.label}】${tail}` : `${att.name}【${o.label}】→ ${tgt.name}：${tail}`,
-      detail, { kind: o.dot ? 'dot' : 'dmg', src: att.id, tgt: tgt.id, amt: dmg - absorbed, absorbed, crit, elem: o.elem, line: !o.dot && !o.breakDmg && !up, fast: o.fast || undefined, ...(o.fxGroup && !o.dot && !up ? o.fxGroup : {}), sub: up ? true : undefined, up: up || undefined,
+      detail, { kind: o.dot ? 'dot' : 'dmg', src: o.fxSrc || att.id, tgt: tgt.id, ...(o.vfx ? { vfx: o.vfx } : {}), amt: dmg - absorbed, absorbed, crit, elem: o.elem, line: !o.dot && !o.breakDmg && !up, fast: o.fast || undefined, ...(o.seg != null ? { seg: o.seg } : {}), ...(o.fxGroup && !o.dot && !up ? o.fxGroup : {}), sub: up ? true : undefined, up: up || undefined,
         ...(o.dot ? { dotType: o.dotType || (/原罪/.test(o.label) ? 'original' : /血破/.test(o.label) ? 'bloodBreak' : /悲悼/.test(o.label) || o.elem === 'sorrow' ? 'mourn' : /裂傷/.test(o.label) ? 'lacer' : o.elem), dotStage: o.dotStage || 1 } : {}) });
 
     const eventIdx = S.log.length - 1;
@@ -1109,6 +1123,7 @@ const Engine = (() => {
     L.tasks.push(Object.assign({ kind, uses: 0 }, TASK_USES[kind] ? { left: TASK_USES[kind] } : {}, o || {}));
     if (!TASK_FREE.has(kind)) L.charge = Math.min(5, L.charge + 0.5);
     log('buff', `時間織機 投入［校準任務·${TASK_NAME[kind]}］${TASK_FREE.has(kind) ? '（常駐任務，不佔儲存）' : `（充能 ${pct(L.charge)}）`}`, '', { kind: 'loom', task: kind, src: (o && o.owner) || null });
+    emit('loomAdd', { kind });
     return true;
   }
   function loomRemove(task) { const L = S.loom, i = L.tasks.indexOf(task); if (i >= 0) L.tasks.splice(i, 1); }
@@ -1127,13 +1142,16 @@ const Engine = (() => {
     L.charge = 0;
     log('info', `⏳ 時間織機 啟動${why ? '（' + why + '）' : ''}：${list.map(x => TASK_NAME[x.kind]).join('、') || '沒有任務'}`, '', { kind: 'loomRun' });
     emit('loomRun', { L });
+    let done = 0;
     for (const task of list) {
       if (!L.tasks.includes(task)) continue;
       task.uses += 1;
       TASKS[task.kind](task);
       emit('loomTask', { task });
+      done++;
     }
     L.pierce = 0;
+    emit('loomDone', { n: done });
     profitEval();
   }
   /**
@@ -2198,6 +2216,253 @@ const Engine = (() => {
   }, 28);
 
   /* =========================================================
+   * 默冬章：月影、水中月、冬／春、冬去春來、校準任務·置閏／歲差、校準優化·補闕
+   *   月影（S.units 裡 side = 'summon' 的單位）：速度與默冬章相同，不會成為敵人的目標；
+   *     輪到它時自動施放普攻／強化普攻（視為追加攻擊，優先打水中月）。傷害以默冬章的數值計算，統計也算在默冬章身上。
+   *     默冬章的行動值被提前／延後時，月影同步移動；月影被延後的累計量（m.delayAcc）達 100% → 消失並觸發「重逢」。
+   *   冬：最多 19 層，滿 19 層可施放終結技（能量環顯示冬）。終結技把冬轉成 19 層春並進入「冬去春來」，春用完時結束。
+   *   時間織機每投入／執行一份校準任務：平時 +1 冬；冬去春來期間改為失去 1 層春（每次失去春 → 春雷）。
+   * ========================================================= */
+  const WINTER_MAX = 19, SPRING_MAX = 19, MOON_LAG = 0.143;
+  TASK_NAME.leap = '置閏';
+  TASK_NAME.precess = '歲差';
+  const metonic = () => alive('metonic');
+  const moonUnit = () => S.units.find(u => u.side === 'summon' && u.key === 'moon' && u.alive) || null;
+  const springing = u => !!u && hasBuff(u, '冬去春來');
+  const moonMarked = () => enemies().find(e => e.moonMark) || null;
+  function syncWinter(u) { const before = u.energy; u.energy = springing(u) ? 0 : Math.min(WINTER_MAX, u.winter || 0); bindEnergy(u, before); }
+  ULT_PAY.metonic = () => {};   // 終結技不使用能量：冬在終結技裡轉成春
+  /** 水中月：只對最新被施加的目標生效 */
+  function setMoonMark(e) {
+    if (!e || !e.alive || e.moonMark) return;
+    S.units.forEach(x => { if (x.side === 'enemy') x.moonMark = false; });
+    e.moonMark = true;
+    log('buff', `${e.name} 被施加標記［水中月］`);
+  }
+  function addWinter(u, n, why) {
+    if (!u || n <= 0) return;
+    if (springing(u)) { loseSpring(u, n, why); return; }   // 冬去春來期間無法獲得冬：改為失去等量的春
+    const before = u.winter || 0;
+    u.winter = Math.min(WINTER_MAX, before + n);
+    syncWinter(u);
+    log('buff', `默冬章 獲得 ${n} 層冬${why ? '（' + why + '）' : ''}：${before} → ${u.winter}${u.winter >= WINTER_MAX ? '（可施放終結技）' : ''}`, '', u.winter > before ? { kind: 'winter', src: u.id, n: u.winter - before, full: u.winter >= WINTER_MAX } : undefined);
+  }
+  /** 失去春：每次失去都觸發春雷（a3 = 額外能力三：少失去 1 層，但春雷仍按原本的層數計算） */
+  function loseSpring(u, n, why, o) {
+    if (!u || !springing(u) || n <= 0) return;
+    o = o || {};
+    const before = u.spring || 0;
+    const lose = Math.min(before, Math.max(0, n - (o.a3 ? 1 : 0)));
+    const thunder = o.a3 ? Math.min(n, before + 1) : lose;
+    u.spring = before - lose;
+    log('buff', `默冬章 失去 ${lose} 層春${why ? '（' + why + '）' : ''}${o.a3 ? '（歸餘於終：少失去 1 層）' : ''}：${before} → ${u.spring}`, '', lose > 0 ? { kind: 'springLose', src: u.id, n: lose } : undefined);
+    if (thunder > 0) { (u.springQ = u.springQ || []).push({ n: thunder }); queueFollowUp(u, 'spring'); }
+    if (u.spring <= 0) leaveSpring(u);
+  }
+  /** 校準優化·補闕：得到或離開冬去春來時投入歲差，並使默冬章造成的傷害 +2%（最多 3 層，5 回合） */
+  function buque(u) {
+    if (!S.loom || !S.loom.buque) return;
+    log('buff', '［校準優化·補闕］觸發');
+    loomAdd('precess', { owner: u.id });
+    const old = u.buffs.find(b => b.name === '補闕'), stacks = Math.min(3, (old ? old.stacks : 0) + 1);
+    addBuff(u, { name: '補闕', dur: 5, stacks, stats: { dmgBonus: 0.02 * stacks } });
+  }
+  function enterSpring(u) {
+    addBuff(u, { name: '冬去春來', dur: 999, stats: { cd: 0.38 } });
+    syncWinter(u);
+    log('buff', '默冬章 進入［冬去春來］：無法獲得冬；自身與月影暴擊傷害 +38%，普攻替換為強化普攻', '', { kind: 'spring', src: u.id, on: true });
+    buque(u);
+  }
+  function leaveSpring(u) {
+    if (!springing(u)) return;
+    removeBuff(u, '冬去春來');
+    syncWinter(u);
+    log('buff', '默冬章 的春已全數消耗，［冬去春來］結束', '', { kind: 'spring', src: u.id, on: false });
+    buque(u);
+  }
+  /** 召喚月影：速度與默冬章相同，初始行動值落後默冬章 14.3% */
+  function summonMoon(u, why) {
+    if (moonUnit() || !u || !u.alive) return moonUnit();
+    const spd = getSpd(u), ownAv = S.current === u.id ? 10000 / spd : u.av;
+    const m = { id: 'm_moon', side: 'summon', key: 'moon', owner: u.id, name: '月影', elem: u.elem, alive: true, buffs: [], base: { lvl: u.base.lvl },
+      maxHp: 1, hp: 1, shield: 0, shieldDur: 0, pendingAdv: 0, av: ownAv + MOON_LAG * 10000 / spd, spdCache: spd, delayAcc: 0, lacer: [] };
+    S.units = S.units.filter(x => x.id !== m.id);
+    S.units.push(m);
+    log('buff', `默冬章 召喚「月影」${why ? '（' + why + '）' : ''}：速度與默冬章相同，行動值落後 14.3%`, '', { kind: 'moonSummon', src: u.id, tgt: m.id });
+    return m;
+  }
+  function dismissMoon(why) {
+    const m = moonUnit();
+    if (!m) return;
+    m.alive = false;
+    S.units = S.units.filter(x => x !== m);
+    log('buff', `「月影」消失${why ? '（' + why + '）' : ''}`, '', { kind: 'moonGone', src: m.owner, tgt: m.id });
+  }
+  /** 月影的行動值延後：累計 ≥ 50% 時第一次觸發舉正於中，≥ 100% 時消失並觸發重逢 */
+  function moonDelay(m, p, why, quiet) {
+    if (!m || !m.alive || p <= 0) return;
+    const u = U(m.owner);
+    m.av += p * 10000 / getSpd(m);
+    m.delayAcc = (m.delayAcc || 0) + p;
+    if (!quiet) log('buff', `月影 行動延後 ${pct(p)}${why ? '（' + why + '）' : ''}：累計 ${pct(m.delayAcc)}`, '', { kind: 'av', tgt: m.id, dir: 'down', p });
+    if (u && u.alive && tr(u, 'a2') && !u.a2Done && m.delayAcc > 0.5 + 1e-9) {
+      u.a2Done = true;
+      log('buff', '默冬章 額外能力二【舉正於中】：月影的行動值第一次被延後超過 50% → 額外發動一次 50% 的強化普攻，下一次攻擊暴擊率 +49%');
+      queueFollowUp(u, 'moonA2');
+    }
+    if (m.delayAcc >= 1 - 1e-9 && u) reunite(u);
+  }
+  /** 重逢：月影消失，默冬章行動提前 35%、下一次戰技不消耗戰技點，獲得 7 層冬（冬去春來中改為失去 7 層春） */
+  function reunite(u) {
+    dismissMoon('行動值被延後達 100%');
+    u.a2Done = false;
+    u.freeSkill = true;
+    addBuff(u, { name: '重逢', dur: 999, stats: {} });
+    log('buff', '默冬章 獲得「重逢」：行動提前 35%，下一次戰技不消耗戰技點', '', { kind: 'reunite', src: u.id });
+    advance(u, 0.35);
+    addWinter(u, 7, '重逢');
+  }
+  // 默冬章的行動序列被改變時，月影同步
+  function moonFollow(u, p, dir) {
+    if (!u || u.key !== 'metonic' || u.side !== 'ally') return;
+    const m = moonUnit();
+    if (!m) return;
+    if (dir === 'up') { m.av = Math.max(0, m.av - p * 10000 / getSpd(m)); log('buff', `月影 同步行動提前 ${pct(p)}`, '', { kind: 'av', tgt: m.id, dir: 'up', p }); }
+    else moonDelay(m, p, '與默冬章同步');
+  }
+  /** 七道月光／枯木終逢春的段數：天賦的增幅每段 +7%（最多 7 次，冬去春來 14 次），默冬章回合結束後重置 */
+  function moonVolley(u, t, o) {
+    if (!t || !t.alive) return;
+    const enh = !!o.enhanced, segs = enh ? 14 : 7, cap = springing(u) ? 14 : 7, scale = o.scale || 1;
+    const label = o.label, targets = [t];
+    const es = enemies(), i = es.indexOf(t), adj = enh ? [es[i - 1], es[i + 1]].filter(Boolean) : [];
+    adj.forEach(e => targets.push(e));
+    for (let k = 0; k < segs && t.alive; k++) {
+      const ramp = 0.07 * (u.ramp || 0);
+      dealDamage(u, t, { mult: (enh ? 0.30 : 0.15) * scale, elem: 'time', label, atype: o.atype, extraBonus: ramp, fxSrc: o.fxSrc, vfx: enh ? 'spring' : 'moon', seg: k, fast: k > 0 || undefined,
+        note: `${k + 1}/${segs} 段${ramp ? `，月不變人事非 +${pct(ramp)}` : ''}` });
+      adj.forEach(e => { if (e.alive) dealDamage(u, e, { mult: 0.15 * scale, elem: 'time', label: label + '·相鄰', atype: o.atype, extraBonus: ramp, fxSrc: o.fxSrc, vfx: 'springSide', seg: k, fast: true }); });
+      u.ramp = Math.min(cap, (u.ramp || 0) + 1);
+    }
+    emit('afterAttack', { att: u, targets: targets.filter(x => x.alive || x === t), marked: [], o: { atype: o.atype } });
+    setMoonMark(t.alive ? t : null);
+  }
+  /** 月影出手（追加攻擊）：優先攻擊水中月 */
+  function moonStrike(u, o) {
+    const m = moonUnit();
+    if (!u || !u.alive || !m || !enemies().length) return;
+    o = o || {};
+    const t = moonMarked() || enemyTarget(), enh = springing(u) || !!o.enhanced;
+    const name = enh ? '枯木終逢春' : '七道月光';
+    log('info', `▶ 月影【${name}】${o.why ? '（' + o.why + '）' : ''}（追加攻擊）`, '', { kind: 'follow', src: u.id, performer: m.id, name: '月影・' + name, artKey: enh ? 'metonic_duo' : 'moon', visual: enh ? 'metonicCoop' : 'moonSolo' });
+    moonVolley(u, t, { enhanced: enh, scale: o.scale, label: `月影·${name}${o.scale ? '（舉正於中）' : ''}`, atype: 'followup', fxSrc: m.id });
+    emit('followUp', { u });
+  }
+  /** 春雷（追加攻擊）：19% × 失去的春，優先打水中月；額外能力一在冬去春來中對相鄰目標造成 50% 的擴散 */
+  function springThunder(u, n, o) {
+    o = o || {};
+    if (!u || !u.alive || !enemies().length || n <= 0) return;
+    const t = o.target && o.target.alive ? o.target : moonMarked() || enemyTarget(), mult = 0.19 * n;
+    log('info', `▶ 默冬章【春雷】${n} 層${o.why ? '（' + o.why + '）' : ''}（追加攻擊）`, '', { kind: 'follow', src: u.id, name: '春雷' });
+    const es = enemies(), i = es.indexOf(t);
+    const adj = tr(u, 'a1') && springing(u) ? [es[i - 1], es[i + 1]].filter(Boolean) : [];
+    attackEach(u, [{ t, mult, label: `追加攻擊·春雷（${n} 層）` }].concat(adj.map(e => ({ t: e, mult: mult * 0.5, label: '追加攻擊·春雷·擴散' }))), { elem: 'time', atype: 'followup', vfx: 'thunder' });
+    emit('followUp', { u });
+  }
+  FOLLOW_UPS.spring = u => { const q = (u.springQ || []).shift(); if (q) springThunder(u, q.n, q); };
+  FOLLOW_UPS.moonNow = u => moonStrike(u, { why: '歧路也有重逢' });
+  FOLLOW_UPS.moonA2 = u => {
+    moonStrike(u, { enhanced: true, scale: 0.5, why: '舉正於中' });
+    if (u.alive) addBuff(u, { name: '舉正於中', dur: 999, consume: true, stats: { cr: 0.49 } });
+  };
+  TASKS.leap = t => {   // 置閏：月影的延遲量 +28.6%；有水中月時對其與相鄰目標造成 95% 時屬性傷害
+    loomRemove(t);
+    const u = metonic();
+    if (!u) return;
+    const m = moonUnit();
+    if (m) moonDelay(m, 0.286, '校準任務·置閏');
+    const e = moonMarked();
+    if (e) {
+      const es = enemies(), i = es.indexOf(e);
+      attackEach(u, [{ t: e, mult: 0.95, label: '校準任務·置閏' }].concat([es[i - 1], es[i + 1]].filter(Boolean).map(x => ({ t: x, mult: 0.95, label: '校準任務·置閏·相鄰' }))), { elem: 'time', atype: 'extra' });
+    }
+  };
+  TASKS.precess = t => {   // 歲差：我方全體行動提前 14.3%
+    loomRemove(t);
+    allies().forEach(a => advance(a, 0.143));
+    log('buff', '［校準任務·歲差］我方全體行動提前 14.3%');
+  };
+  SKILLS.metonic = {
+    basic(u) {
+      if (springing(u)) return SKILLS.metonic.enhanced(u);
+      const t = enemyTarget(); spGain();
+      moonVolley(u, t, { label: '普攻·七道月光', atype: 'basic' });
+    },
+    /** 強化普攻：與月影協同施放（不恢復戰技點；沒有月影時先召喚） */
+    enhanced(u) {
+      if (!moonUnit()) summonMoon(u, '枯木終逢春');
+      const m = moonUnit();
+      log('info', '▶ 默冬章 × 月影【枯木終逢春】（協同攻擊）', '', { kind: 'coop', src: u.id, partner: m && m.id, name: '枯木終逢春', artKey: 'metonic_duo' });
+      moonVolley(u, enemyTarget(), { enhanced: true, label: '強化普攻·枯木終逢春', atype: 'basic' });
+    },
+    skill(u, opt) {
+      if (opt && opt.free) log('buff', '秘技：這次戰技不消耗戰技點');
+      else if (u.freeSkill) { u.freeSkill = false; removeBuff(u, '重逢'); log('buff', '「重逢」：這次戰技不消耗戰技點'); }
+      else spUse();
+      loomAdd('leap', { owner: u.id });
+      const m = moonUnit();
+      if (!m) { summonMoon(u, '歧路也有重逢'); return; }
+      moonDelay(m, MOON_LAG, '歧路也有重逢');
+      if (moonUnit()) queueFollowUp(u, 'moonNow');
+    },
+    ult(u) {
+      const marked = moonMarked();
+      log('buff', `默冬章 將 ${u.winter} 層冬轉換為 ${SPRING_MAX} 層春`);
+      u.winter = 0; u.spring = SPRING_MAX;
+      attack(u, enemies(), 2.35, 'time', '終結技·十九個冬天以後是十九個春天', { tough: 20, atype: 'ult' });
+      enterSpring(u);
+      if (marked && marked.alive) {
+        marked.moonMark = false;
+        log('buff', `${marked.name} 的［水中月］消失 → 受到一次等同失去 7 層春的春雷（不消耗春）`);
+        (u.springQ = u.springQ || []).push({ n: 7, target: marked, why: '水中月' });
+        queueFollowUp(u, 'spring');
+      }
+    },
+  };
+  // 時間織機每投入一份校準任務：+1 冬（冬去春來中失去 1 層春）
+  on('loomAdd', c => { const u = metonic(); if (u) addWinter(u, 1, `投入［校準任務·${TASK_NAME[c.kind]}］`); }, 10);
+  // 時間織機每執行一份校準任務：+1 冬（冬去春來中失去 1 層春）；額外能力三：執行 ≥ 3 份時多 1 層冬／少失去 1 層春
+  on('loomDone', c => {
+    const u = metonic();
+    if (!u || c.n <= 0) return;
+    const a3 = tr(u, 'a3') && c.n >= 3;
+    if (springing(u)) loseSpring(u, c.n, `時間織機執行 ${c.n} 份任務`, { a3 });
+    else addWinter(u, c.n + (a3 ? 1 : 0), `時間織機執行 ${c.n} 份任務${a3 ? '，歸餘於終 +1' : ''}`);
+  }, 10);
+  // 水中月：每次受到我方攻擊後，額外受到默冬章攻擊力 12% 的時屬性附加傷害
+  on('afterAttack', c => {
+    const u = metonic();
+    if (!u || c.att.side !== 'ally') return;
+    c.targets.filter(e => e && e.alive && e.side === 'enemy' && e.moonMark).forEach(e => dealDamage(u, e, { mult: 0.12, elem: 'time', label: '水中月·附加傷害', atype: 'extra', sub: true }));
+  }, 70);
+  // 天賦的段數增幅：默冬章回合結束後重置
+  on('turnEnd', c => { if (c.u.key === 'metonic') c.u.ramp = 0; }, 6);
+  // 額外能力一：每層冬或春 → 暴擊率 +1%（最多 19%）、攻擊力 +1.5%（最多 28.5%）；月影以默冬章的數值計算，因此同樣生效
+  mod('cr', u => (u.key === 'metonic' && tr(u, 'a1') ? Math.min(19, (u.winter || 0) + (u.spring || 0)) * 0.01 : 0), 40);
+  mod('atkPct', u => (u.key === 'metonic' && tr(u, 'a1') ? Math.min(19, (u.winter || 0) + (u.spring || 0)) * 0.015 : 0), 40);
+  // 默冬章倒下 → 月影消失；換波保留月影
+  on('onKill', c => { if (c.u.key === 'metonic' && c.u.side === 'ally') dismissMoon('默冬章倒下'); }, 38);
+  // 秘技：在那遙遠的北方
+  on('battleStart', () => {
+    const u = metonic();
+    if (!u || !S.rules.metonicTechnique) return;
+    log('info', '默冬章 秘技【在那遙遠的北方】');
+    addWinter(u, 7, '秘技');
+    SKILLS.metonic.skill(u, { free: true });
+    resolveFollowUps();
+  }, 60);
+
+  /* =========================================================
    * 妙具套裝
    * ========================================================= */
   mod('atkPct', u => (hasSet(u, 'neon2') && rawSpd(u) >= 120 ? 0.12 : 0), 30);                                       // 霓虹不夜街 2
@@ -2419,6 +2684,29 @@ const Engine = (() => {
     const k = stackBuff(u, '受難', 4, 2, s => ({ dmgBonus: lc.v.pain / 100 * s }));
     log('buff', `金句《無人應答的禱告》：${u.name} 承受持續傷害 →【受難】${k} 層（增傷 +${Math.round(lc.v.pain * k)}%）`);
   }, 45);
+  // 《十九年後的同一輪月》性相層［圓缺］：每次追加攻擊 +1 層（最多 3 層），下一次普攻增傷，施放普攻後移除
+  on('followUp', c => {
+    const u = c.u, lc = lcOn(u, 'sameMoon');
+    if (!lc || !u.alive) return;
+    const old = u.buffs.find(b => b.name === '圓缺'), stacks = Math.min(3, (old ? old.stacks : 0) + 1);
+    if (old && old.stacks === stacks) return;
+    addBuff(u, { name: '圓缺', dur: 999, stacks, stats: {} });
+    log('buff', `金句《十九年後的同一輪月》［圓缺］：${u.name} 下一次普攻增傷 ${pct(lc.v.wane / 100 * stacks)}（${stacks} 層）`);
+  }, 40);
+  on('beforeHit', c => { const lc = lcOn(c.att, 'sameMoon'), b = lc && c.o.atype === 'basic' && c.att.buffs.find(x => x.name === '圓缺'); if (b) c.mod.dmg += lc.v.wane / 100 * b.stacks; }, 57);
+  on('afterAction', c => { if (c.kind === 'basic' && hasBuff(c.u, '圓缺')) removeBuff(c.u, '圓缺'); }, 57);
+  // 權能層［朔望］：時間織機每執行一份任務 +1 層攻擊力（最多 7 層，2 回合）；單次執行 ≥ 3 份 → 行動提前
+  on('loomDone', c => {
+    if (c.n <= 0) return;
+    allies().forEach(a => {
+      const lc = lcOn(a, 'sameMoon', 'power');
+      if (!lc) return;
+      const old = a.buffs.find(b => b.name === '朔望'), stacks = Math.min(7, (old ? old.stacks : 0) + c.n);
+      addBuff(a, { name: '朔望', dur: 2, stacks, stats: { atkPct: lc.v.atk / 100 * stacks } });
+      log('buff', `金句《十九年後的同一輪月》［朔望］：${a.name} 攻擊力 +${pct(lc.v.atk / 100 * stacks)}（${stacks} 層，2 回合）`);
+      if (c.n >= 3) advance(a, lc.v.adv / 100);
+    });
+  }, 20);
   mod('cd', u => { const lc = lcOn(u, 'noAnswer'); return lc && u.hp < u.maxHp * 0.5 ? lc.v.cd / 100 : 0; }, 55);
   on('cashout', c => {
     const h = cashLc(c, 'noAnswer')[0], lc = h && lcOn(h, 'noAnswer', 'power');
@@ -2657,6 +2945,13 @@ const Engine = (() => {
     u.ownTurns = (u.ownTurns || 0) + 1;
     log('turn', `${extra ? '【額外回合】' : ''}${u.name} 的回合`, '', { kind: 'turn', src: u.id });
     if (u.side === 'timer') { flowEnd(); S.current = null; return; }   // 星流計時器
+    if (u.side === 'summon') {   // 月影：自動施放普攻／強化普攻（追加攻擊）
+      moonStrike(U(u.owner));
+      resolveFollowUps();
+      if (checkEnd()) return;
+      finishTurn(u);
+      return;
+    }
     if (u.side === 'enemy') {
       if (!extra) emit('dotTick', { u });   // 額外回合（雷霆-09 的緝捕行動）不結算持續傷害
       if (checkEnd()) return;
@@ -2750,7 +3045,7 @@ const Engine = (() => {
   }
   function spawnWave(i) {
     S.wave = i;
-    S.units = S.units.filter(u => u.side === 'ally' || u.side === 'timer');
+    S.units = S.units.filter(u => u.side === 'ally' || u.side === 'timer' || u.side === 'summon');
     S.waves[i].forEach((c, j) => S.units.push(mkEnemy(c, i, j)));
     S.target = null;
     log('wave', `━━ 第 ${i + 1} / ${S.waves.length} 波 ━━`, '', { kind: 'wave' });
@@ -2783,11 +3078,12 @@ const Engine = (() => {
         shield: 0, shieldDur: 0, stunned: false,
         av: 0, alive: true, buffs: [], pendingAdv: 0, mark: null, tacit: 0, clues: 0, cover: 0, siren: 0, ticks: 0, exp: 0, lacer: [], suffer: 0, wanted: 0,
       };
+      if (key === 'metonic') Object.assign(u, { winter: 0, spring: 0, ramp: 0, energy: 0 });
       S.units.push(u);
     });
     // 時間織機：隊伍中有平衡權能角色時才存在；股市屬於戈登的天賦
     const hasGordon = !!findKey('gordon');
-    S.loom = S.units.some(u => CHARS[u.key].power === '平衡') ? { tasks: [], charge: 0, market: 0, hist: [0], gordon: hasGordon, profit: hasGordon } : null;
+    S.loom = S.units.some(u => CHARS[u.key].power === '平衡') ? { tasks: [], charge: 0, market: 0, hist: [0], gordon: hasGordon, profit: hasGordon, buque: !!findKey('metonic') } : null;
     // 兌現匣：隊伍中有本質權能角色時才存在
     S.cashbox = S.units.some(essenceAlly) && cashOn() ? { items: [], count: 0 } : null;
     // 星流：隊伍中有情感權能角色時才存在
@@ -2822,7 +3118,7 @@ const Engine = (() => {
       return true;
     }
     if (!u.alive) { S.current = null; if (!previewing) runUntilInput(); return true; }
-    const enh = (u.key === 'kane' && kaneEnhanced()) || (u.key === 'alan' && u.cover > 0) || (u.key === 'otg' && !!S.duel);
+    const enh = (u.key === 'kane' && kaneEnhanced()) || (u.key === 'alan' && u.cover > 0) || (u.key === 'otg' && !!S.duel) || (u.key === 'metonic' && hasBuff(u, '冬去春來'));
     const name = kind === 'skill' ? '戰技·' + CHARS[u.key].actions.skill
       : (enh ? '強化普攻·' + CHARS[u.key].actions.enhanced : '普攻·' + CHARS[u.key].actions.basic);
     log('act', `${u.name} 使用 ${name}`, '', { kind: 'cast', src: u.id });
@@ -2978,6 +3274,12 @@ const Engine = (() => {
       const few = es.filter(e => e.mourn.length < 3);
       S.target = highestHp(few.length ? few : es).id;
       if (canSkillFor(u) && (S.rules.infiniteSP || S.sp >= 2)) { kind = 'skill'; S.target = highestHp(es).id; }
+    } else if (u.key === 'metonic') {
+      // 沒有月影或有免費戰技時施放戰技（召喚／延後月影，推向重逢）；冬去春來中普攻已是強化普攻，直接普攻
+      const mk = es.find(e => e.moonMark);
+      S.target = (mk || highestHp(es)).id;
+      const m = moonUnit();
+      if (u.freeSkill || (canSkillFor(u) && !hasBuff(u, '冬去春來') && (!m || S.rules.infiniteSP || S.sp >= 3))) kind = 'skill';
     } else if (u.key === 'hanye') {
       // 能拿額外回合時先普攻（織機裡已有度量或測度、還有空位、不在天賦的額外回合中）；
       // 沒有遞推時先累積到 24 段：刻度同時提升暴率，避免低段戰技頻繁清空刻度；單敵瀕死則提前收尾

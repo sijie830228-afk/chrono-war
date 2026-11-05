@@ -12,6 +12,7 @@ const CastFx = (() => {
     mark: ['#83dbff', '#112e42', '水行有道・盈科後進'],
     miller: ['#c7b9f0', '#22192d', '雨中送行・銘記不忘'],
     otg: ['#f48a9e', '#230f24', '苦難解封・滿月無神'],
+    metonic: ['#e6cf9e', '#151a2e', '十九年一章・冬去春來'],
   };
   const line = (x1,y1,x2,y2,cls='') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`;
   const path = (d,cls='') => `<path d="${d}" class="${cls}"/>`;
@@ -89,6 +90,11 @@ const CastFx = (() => {
         <g class="cs-inverted-cross">${path('M1190 360V735M1090 610H1290')}</g>
         <g class="cs-chains">${[0,1].map(j=>Array.from({length:18},(_,i)=>`<rect transform="translate(${i*100-30} ${j?870-i*38:30+i*38}) rotate(${j?-22:22})" x="-60" y="-${i%2?16:23}" width="120" height="${i%2?32:46}" rx="${i%2?16:23}"/>`).join('')).join('')}</g>
         <g class="cs-blood-orbit">${circle(1190,285,235)}${path('M985 400 960 600M1390 410 1420 670M1180 735l-10 80')}</g></g>`;
+      case 'metonic': return `<g data-motif="antikythera">
+        <g class="cs-gears">${[[1180,300,190,38],[960,520,110,22],[1380,560,90,18]].map(([x,y,r,n])=>`${circle(x,y,r)}${circle(x,y,r*0.62)}${path(Array.from({length:n},(_,i)=>{const a=i/n*Math.PI*2;return `M${(x+Math.cos(a)*r).toFixed(1)} ${(y+Math.sin(a)*r).toFixed(1)}L${(x+Math.cos(a)*(r+16)).toFixed(1)} ${(y+Math.sin(a)*(r+16)).toFixed(1)}`;}).join(''))}`).join('')}</g>
+        <g class="cs-metonic-ring">${Array.from({length:19},(_,i)=>{const a=i/19*Math.PI*2-Math.PI/2;return circle((1180+Math.cos(a)*250).toFixed(1),(300+Math.sin(a)*250).toFixed(1),i%2?7:11);}).join('')}</g>
+        <g class="cs-phases">${Array.from({length:7},(_,i)=>path(`M${560+i*120} 760a34 34 0 1 0 0 68a${(34-i*9.7).toFixed(1)} 34 0 1 1 0-68`)).join('')}</g>
+        ${text(1180,312,'19','cs-center cs-mono')}</g>`;
       default: return '';
     }
   }

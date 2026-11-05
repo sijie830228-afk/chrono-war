@@ -1333,16 +1333,6 @@ const UltFilm = (() => {
     g.strokeStyle = '#0e070b'; g.lineWidth = 5; g.beginPath(); g.moveTo(1680, 740); g.lineTo(1680, 360); g.moveTo(1640, 420); g.lineTo(1720, 420); g.moveTo(1650, 480); g.lineTo(1710, 480); g.stroke();
     s.roof = bg;
   }
-  function rifle(c, x, y, sc, rot) {
-    c.save(); c.translate(x, y); c.rotate(rot); c.scale(sc, sc);
-    c.fillStyle = '#0c080a';
-    c.fillRect(-60, -10, 700, 16); c.fillRect(-260, -20, 220, 44); poly(c, [[-260, -20], [-360, 10], [-360, 50], [-240, 24]]); c.fill();
-    c.fillRect(-40, 6, 30, 60); c.fillRect(60, 6, 24, 40);
-    c.fillStyle = '#1a1014'; c.fillRect(-120, -52, 200, 26); c.beginPath(); c.arc(80, -39, 17, 0, TAU); c.fill();
-    c.fillStyle = 'rgba(255,190,120,.8)'; c.beginPath(); c.arc(86, -40, 6, 0, TAU); c.fill();
-    c.strokeStyle = 'rgba(255,150,90,.45)'; c.lineWidth = 2; c.beginPath(); c.moveTo(-60, -10); c.lineTo(640, -10); c.stroke();
-    c.restore();
-  }
   function streetDusk(c, t, s, k, o) {
     o = o || {};
     c.save(); cam(c, k, 0.6); layer(c, s.dayBG); c.restore();
@@ -1390,7 +1380,7 @@ const UltFilm = (() => {
       if (t < 1800) {   // 頂樓
         const k = { x: lerp(-40, 20, t / 1800), y: 0, z: 1.03 + eio(prog(t, 0, 1800)) * 0.06, r: 0 };
         c.save(); cam(c, k, 0.7); layer(c, s.roof); c.restore();
-        c.save(); cam(c, k, 1.1); heroDraw(c, H0, 'warm', 520, 360, 1150, { rim: 'rim', rimDx: 6 }); rifle(c, 820, 700, 0.9, -0.05); c.restore();
+        c.save(); cam(c, k, 1.1); heroDraw(c, H0, 'warm', 520, 360, 1150, { rim: 'rim', rimDx: 6 }); c.restore();   // 新立繪本身就架著狙擊槍，不再另外畫一把
         dust(1); vignette(c, 0.6, 'rgba(20,6,16,1)');
         return;
       }
@@ -1897,15 +1887,19 @@ const UltFilm = (() => {
         gridFloor(c, t, eo(prog(t, 2600, 3100)), t * 0.001);
         glow(c, m.x + 200, 640, 260, 'rgba(143,180,255,.3)', prog(t, 2800, 3200)); foe(c, s.enMain, m.x + 200, 760, 300, { alpha: prog(t, 2800, 3200), filter: 'brightness(1.5)' });
         const k = { x: 0, y: 0, z: 1 + prog(t, 2600, 4300) * 0.06, r: 0 };
-        const sc = 1000 / 1280, hx = 620, hy = 40;   // 立繪以臉為錨點；劍從護手 (575,640) 延伸到劍尖 (775,1180)（原圖座標），整把劍都要在畫面內
-        heroDraw(c, H0, 'lit', hx, hy, 1000, { rim: 'rim', rimDx: -6 });
+        const hx = 640, hy = 170, hh = 1000;   // 立繪以臉為錨點；整把劍與頭頂都要在畫面內
+        heroDraw(c, H0, 'lit', hx, hy, hh, { rim: 'rim', rimDx: -6 });
+        // 劍：從護手 (0.918, 0.443) 平舉到劍尖 (0.02, 0.376)（以立繪寬高的比例表示），刻度垂直於劍身一格一格亮起
+        const ap = (fx, fy) => H0 ? { x: hx + (fx * H0.a.w - H0.a.facePx[0]) * hh / H0.a.h, y: hy + (fy * H0.a.h - H0.a.facePx[1]) * hh / H0.a.h } : { x: hx + (fx - 0.5) * 660, y: hy + (fy - 0.15) * hh };
+        const g0 = ap(0.918, 0.443), g1 = ap(0.02, 0.376), ang = Math.atan2(g1.y - g0.y, g1.x - g0.x);
         for (let i = 0; i < 12; i++) {   // 劍身上一格一格亮起的刻度
           const p = prog(t, 3100 + i * 70, 3200 + i * 70); if (p <= 0) continue;
-          const u = 0.08 + i * 0.075, x = hx + (575 + 200 * u - 401) * sc, y = hy + (640 + 540 * u - 70) * sc;
+          const u = 0.16 + i * 0.07, x = lerp(g0.x, g1.x, u), y = lerp(g0.y, g1.y, u);
           const w = i % 4 ? 30 : 52;
-          c.save(); c.globalAlpha = p; c.fillStyle = '#7fa8ff'; c.shadowColor = '#cfe0ff'; c.shadowBlur = 18; c.fillRect(x - w / 2, y - 3, w, 6);
-          if (i % 4 === 0) { c.font = '700 22px "Courier New", monospace'; c.fillStyle = '#cfe0ff'; c.fillText(String(i / 4 + 1), x + w / 2 + 8, y + 8); }
+          c.save(); c.globalAlpha = p; c.translate(x, y); c.rotate(ang + Math.PI / 2);
+          c.fillStyle = '#7fa8ff'; c.shadowColor = '#cfe0ff'; c.shadowBlur = 18; c.fillRect(-w / 2, -3, w, 6);
           c.restore();
+          if (i % 4 === 0) { c.save(); c.globalAlpha = p; c.font = '700 22px "Courier New", monospace'; c.fillStyle = '#cfe0ff'; c.fillText(String(i / 4 + 1), x - 6, y - w / 2 - 10); c.restore(); }
         }
         full(c, '#dfe8ff', 0.5 * bump(t, 2620, 160));
         vignette(c, 0.6, 'rgba(0,2,10,1)');
@@ -2353,7 +2347,7 @@ const UltFilm = (() => {
         });
         // 馬克與匯流的水環
         const hp = prog(t, 5000, 6650);
-        filmHero(c, s, 'lit', 300 + hp * 30, 235, 800, { rim: 'rim', rimDx: -5, alpha: eo(prog(t, 5000, 5600)) });
+        filmHero(c, s, 'lit', 300 + hp * 30, 320, 800, { rim: 'rim', rimDx: -5, alpha: eo(prog(t, 5000, 5600)) });
         c.save(); c.globalCompositeOperation = 'lighter';
         for (let i = 0; i < 8; i++) {
           c.strokeStyle = i % 2 ? '#93f4ff88' : '#327edcaa'; c.lineWidth = 3 + i % 3; c.globalAlpha = prog(t, 5200, 5800) * (1 - prog(t, 6700, 7000));
@@ -2436,7 +2430,7 @@ const UltFilm = (() => {
       layer(c, s.waterCourt); full(c, '#acd7cd', 0.18);
       glow(c, 1170, 290, 550, 'rgba(255,224,158,.45)', 1);
       for (let i = 0; i < 7; i++) stillRipple(c, 1160, 790, 80 + ((t - 11400 + i * 230) % 2000) * 0.3, 0.25, '#bdf6ee');
-      filmHero(c, s, 'day', 1205, 160, 730, { rim: 'rimW', rimDx: -3 });
+      filmHero(c, s, 'day', 1205, 350, 900, { rim: 'rimW', rimDx: -3 });   // 蹲姿立繪：腳落在漣漪上
       for (let i = 0; i < 22; i++) { const x = hash(i) * W, y = (hash(i + 5) * H - (t - 11400) * (0.02 + hash(i) * 0.04) + H) % H; glow(c, x, y, 3 + hash(i + 8) * 4, '#a5faff', 0.5); }
       heroTitle(c, t, 11650, { band: '5,38,58', accent: '#8ce4ed', en: 'ONWARD, LIKE WATER', enSize: 51, zh: '盈科後進', zhSize: 57, sub: 'MARK ／ 觀察・理解・實踐', subX: 330, zhCol: '#dcffff' });
       full(c, '#bbf2ed', 1 - prog(t, 11400, 11760));
