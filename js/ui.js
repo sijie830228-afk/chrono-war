@@ -15,6 +15,7 @@ let view = 'battle';
 let sideTab = 'log';
 let queue = [], playing = false, V = null, playTimer = null;   // 播放佇列
 let armed = null;                                              // 蓄勢中的終結技角色 id
+let loomQueued = false, insertOrder = [];                      // 終結技與時間織機共用確認順序
 let ultQueue = [];                                             // 預約的終結技（在空檔依序發動）
 let logOpen = false;                                           // 戰鬥紀錄抽屜
 let paused = false;                                            // 暫停選單開啟中
@@ -29,7 +30,7 @@ let readyPrev = {}, endCued = false;                           // 音效：終�
 const DELAY = { turn: 520, act: 420, ult: 1350, dmg: 430, hurt: 430, dot: 150, heal: 420, shield: 330, break: 700,
   kill: 600, wave: 1000, sys: 500, info: 340, buff: 210 };
 let playbackEpoch = 0, impactTimers = new Set(), dotChain = false;
-const HIT_MS = { kane: 90, longzhao: 140, mocha: 360, alan: 110, alexandra: 120, hanye: 60, gordon: 70, mark: 150, miller: 160, otg: 110, enemy: 60 };
+const HIT_MS = { kane: 90, longzhao: 140, mocha: 280, alan: 110, alexandra: 120, hanye: 60, gordon: 70, mark: 150, miller: 160, otg: 110, metonic: 120, moon: 120, enemy: 60 };
 function impactLater(fn, delay) {
   const epoch = playbackEpoch;
   const id = setTimeout(() => { impactTimers.delete(id); if (epoch === playbackEpoch) fn(); }, delay);
@@ -185,15 +186,24 @@ function groupSubs(evs) {
 }
 /**
  * 空檔處理：引擎停在「敵人回合之間」或我方回合時，
- * 先發動預約的終結技；若是空檔且沒有預約，就繼續推進。回傳是否又執行了指令。
+ * 按確認順序發動預約的終結技與時間織機；沒有預約時繼續推進。回傳是否執行了指令。
  */
 function pump() {
   const S = Engine.state();
   if (!S || view !== 'battle' || paused || playing) return false;
   if (S.phase === 'input' || S.phase === 'between') {
     ultQueue = ultQueue.filter(id => Engine.canUlt(id));
-    if (ultQueue.length) {
-      const id = ultQueue.shift();
+    if (!Engine.canLoom()) loomQueued = false;
+    insertOrder = insertOrder.filter(id => id === 'loom' ? loomQueued : ultQueue.includes(id));
+    const next = insertOrder.shift() || ultQueue[0] || (loomQueued ? 'loom' : null);
+    if (next === 'loom') {
+      loomQueued = false;
+      run(() => Engine.loom());
+      return true;
+    }
+    if (next) {
+      const id = next;
+      ultQueue = ultQueue.filter(x => x !== id);
       if (armed === id) armed = null;
       run(() => Engine.ult(id));
       return true;
@@ -229,13 +239,15 @@ function playNext() {
   shownLog = Math.max(shownLog, ev.idx + 1, ...(ev.subs || []).map(x => x.idx + 1));
   let hold = (DELAY[ev.entry.type] || 300) / CFG.ui.speed;
   if (ev.fx && ev.fx.kind === 'dot') dotChain = true;
-  else if (['turn', 'act', 'ult', 'wave', 'kill'].includes(ev.entry.type) || ev.fx && ['follow', 'proxy', 'dmg', 'drift', 'cashout', 'loomRun'].includes(ev.fx.kind)) dotChain = false;
+  else if (['turn', 'act', 'ult', 'wave', 'kill'].includes(ev.entry.type) || ev.fx && ['follow', 'coop', 'proxy', 'dmg', 'drift', 'cashout', 'loomRun'].includes(ev.fx.kind)) dotChain = false;
   if (dotChain && ['info', 'buff'].includes(ev.entry.type) && !ev.fx) hold = 45 / CFG.ui.speed;
   if (ev.fx && ev.fx.fast) hold *= 0.32;                                            // 寒夜的連續彈射
   else if (ev.fx && ev.fx.kind === 'riemann') hold = (ev.fx.n >= 12 ? 1100 : 800) / CFG.ui.speed;
   else if (ev.fx && ev.fx.kind === 'cashout') hold = 1000 / CFG.ui.speed;
   else if (ev.fx && ev.fx.kind === 'residue' && ev.fx.full) hold = Math.max(hold, (560 + 120 * Math.max(0, ev.fx.n - 1) + 60) * FXK());   // 光點全部落進彈匣後才兌現
   else if (ev.fx && ev.fx.kind === 'proxy') hold = 1050 * FXK();
+  else if (ev.fx && (ev.fx.kind === 'coop' || ev.fx.visual === 'metonicCoop')) hold = 1450 * FXK();
+  else if (ev.fx && ev.fx.visual === 'moonSolo') hold = 1250 * FXK();
   else if (ev.fx && ev.fx.kind === 'follow') hold = (ev.fx.visual === 'policeDrift' ? 1150 : 650) / CFG.ui.speed;
   else if (ev.fx && ev.fx.kind === 'drift') hold = 1150 / CFG.ui.speed;
   else if (ev.fx && ev.fx.kind === 'phase') hold = 1300 / CFG.ui.speed;
@@ -271,7 +283,7 @@ function driftHits(src) {
   let last = -1;
   for (let i = 0; i < queue.length; i++) {
     const q = queue[i], f = q.fx;
-    if (['turn', 'act', 'ult', 'wave'].includes(q.entry.type) || f && ['follow', 'proxy', 'cashout', 'loomRun', 'drift'].includes(f.kind)) break;
+    if (['turn', 'act', 'ult', 'wave'].includes(q.entry.type) || f && ['follow', 'coop', 'proxy', 'cashout', 'loomRun', 'drift'].includes(f.kind)) break;
     if (f && f.src === src && f.kind === 'dmg' && !f.sub) last = i;
   }
   if (last < 0) return null;
@@ -307,7 +319,7 @@ function playArea(ev) {
   let last = -1;
   for (let i = 0; g != null && i < queue.length; i++) {
     const q = queue[i], f = q.fx;
-    if (['turn', 'act', 'ult', 'wave'].includes(q.entry.type) || f && ['follow', 'proxy', 'cashout', 'loomRun', 'drift', 'ult', 'eult'].includes(f.kind)) break;
+    if (['turn', 'act', 'ult', 'wave'].includes(q.entry.type) || f && ['follow', 'coop', 'proxy', 'cashout', 'loomRun', 'drift', 'ult', 'eult'].includes(f.kind)) break;
     if (f && f.grp === g) last = i;
   }
   const pending = [ev].concat(queue.splice(0, last + 1));
@@ -317,7 +329,7 @@ function playArea(ev) {
   tg.forEach(x => { const c = center(x.el); x.hp = { x: c.x, y: c.r.top + c.r.height * 0.55 }; });
   tg.sort((a, b) => a.hp.x - b.hp.x);
   const W = viewState(), src = (W.units || []).find(u => u.id === ev.fx.src);
-  const key = src && src.side === 'ally' ? src.key : 'enemy';
+  const key = src && src.side === 'summon' ? 'moon' : src && src.side === 'ally' ? src.key : 'enemy';
   addCls(s, 'lunge');
   Sound.play('atk_' + key);
   const at = areaFx(key, ev.fx, s, tg, ev.fx.area);
@@ -383,13 +395,24 @@ function areaFx(key, f, s, tg, area) {
       tg.forEach(x => later(() => { burst(x.hp, 'splat', '#b30f25', 0.5); sparks(x.hp, '#d0142c', 10, 60); }, (at[x.id] / k)));
       break;
     }
-    case 'mocha': {       // 地面結霜擴開，冰錐從每個目標腳下依序竄出
-      burst({ x: C.x, y: C.y + 40 }, 'frostfloor', '#9fe4ff', 0.7);
+    case 'mocha': {       // 一根長水管以整排正下方為支點掄成半圓，由左往右掃過整排；每個目標被掃到時迸出火花，水珠凍成冰晶
+      const pv = { x: C.x, y: C.y + 230 }, len = Math.max(...tg.map(x => Math.hypot(x.hp.x - pv.x, x.hp.y - pv.y))) + 60;
+      const times = pipeSwing(pv, len, -178, -2, 0.72, tg.map(x => x.hp), 'wide');
       tg.forEach((x, i) => {
-        const t0 = 220 + Math.abs(x.hp.x - C.x) / Math.max(1, span) * 260;
-        later(() => { [-14, 0, 14].forEach((o, j) => fxDiv('icespike', x.hp.x + o, x.hp.y + 44, `--s:${j === 1 ? 1 : 0.7};animation-duration:${0.55 * k}s`, 650)); burst(x.hp, 'frost', '#9fe4ff', 0.5); }, t0);
-        set(x, t0 + 60);
+        at[x.id] = times[i];
+        setTimeout(() => { sparks(x.hp, '#fff2c8', 8, 60); burst(x.hp, 'frost', '#9fe4ff', 0.5); iceSpray(x.hp, 0.7); }, times[i]);
+        Sound.play('pipeClang', { delay: times[i] / 1000, gap: 0 });
       });
+      break;
+    }
+    case 'metonic:blast': {   // 春雷：主雷劈在主目標，分岔的電弧跳到兩側；其他（置閏）：金銀光分別落在每個目標上
+      if (f.vfx === 'thunder') {
+        springBolt(main.hp, 1); set(main, 70);
+        side.forEach(x => { later(() => { arcBolt(main.hp, x.hp); springBolt(x.hp, 0.6, true); }, 150); set(x, 200); });
+        Sound.play('springThunder');
+        break;
+      }
+      tg.forEach((x, i) => { const sv = i % 2 === 1; later(() => skyFall(x.hp, sv ? '#e3e9ff' : '#ffd98a', sv ? 14 : -14, x === main ? 1.2 : 0.8), i * 60); set(x, 120 + i * 60); later(() => burst(x.hp, 'moonflare', sv ? '#e3e9ff' : '#ffd98a', 0.35), 120 + i * 60); });
       break;
     }
     case 'gordon': {      // 做多：一條走勢線由左往右爬升，K 線沿途長出，金幣灑在每個目標上
@@ -623,7 +646,7 @@ function scheduleUltHits(show) {
   let last = -1;
   for (let i = 0; i < queue.length; i++) {
     const q = queue[i], k = q.fx && q.fx.kind;
-    if (ULT_STOP.has(q.entry.type) || k === 'follow' || k === 'proxy' || k === 'cashout' || k === 'loomRun' || k === 'flowExt') break;
+    if (ULT_STOP.has(q.entry.type) || k === 'follow' || k === 'coop' || k === 'proxy' || k === 'cashout' || k === 'loomRun' || k === 'flowExt') break;
     if (k === 'dmg' || k === 'dot') last = i;
   }
   if (last < 0) return;
@@ -738,7 +761,7 @@ function drawLine(from, to, color) {
   setTimeout(() => { ln.remove(); c.remove(); }, 900);
 }
 /** 校準任務飛向時間織機的小卡片 */
-const TASK_COL = { up: '#ff5a64', down: '#3fd884', hedge: '#ffd36a', measure: '#8fb4ff', gauge: '#8fb4ff' };
+const TASK_COL = { up: '#ff5a64', down: '#3fd884', hedge: '#ffd36a', measure: '#8fb4ff', gauge: '#8fb4ff', leap: '#d8bb8c', precess: '#d8bb8c' };
 
 function flyChip(from, to, text, col) {
   const a = center(from), b = center(to);
@@ -817,30 +840,39 @@ function riemannFx(n, construct, curve = {}) {
   requestAnimationFrame(step);
 }
 /** 追加攻擊與代理執行共用橫幅；代理依事件記錄的實際執行者選取單人頭像。 */
-const FB_PARTS = { fire: 'ember', ice: 'shard', wind: 'streak', water: 'drop', phys: 'cut', space: 'cell', luck: 'coin', thunder: 'bolt', grass: 'leaf', sorrow: 'drop', joy: 'ember', anger: 'ember', mirth: 'coin' };
+const FB_PARTS = { fire: 'ember', ice: 'shard', wind: 'streak', water: 'drop', phys: 'cut', space: 'cell', luck: 'coin', time: 'cell', thunder: 'bolt', grass: 'leaf', sorrow: 'drop', joy: 'ember', anger: 'ember', mirth: 'coin' };
 function followBanner(f) {
   const W = viewState();
   const u = (W.units || []).find(x => x.id === f.src) || Engine.state().units.find(x => x.id === f.src);
   const field = $('.field');
   if (!u || !field) return;
-  document.querySelectorAll('#fx .fbanner').forEach(e => e.remove());   // 連續追擊：只留最新的一條
+  document.querySelectorAll('#fx .fbanner').forEach(e => e.remove());
   const proxy = f.kind === 'proxy';
+  const coop = u.key === 'metonic' && (f.kind === 'coop' || f.visual === 'metonicCoop');
+  const moon = u.key === 'metonic' && !coop && f.visual === 'moonSolo', lunar = coop || moon;
   const role = proxy && f.role === 'elder' ? '兄' : proxy && f.role === 'younger' ? '弟' : '';
-  const artKey = proxy && role ? 'mocha_' + f.role : u.key;
-  const ch = Engine.CHARS[u.key], col = ELEM_COLOR[u.elem] || '#fff', r = field.getBoundingClientRect(), art = Art.get(artKey);
-  const label = proxy ? '代理執行' : '追加攻擊', who = role ? '莫卡兄弟・' + role : ch.fullName || ch.name;
-  const duration = proxy ? 1.05 : 1.25;
-  const left = proxy ? Math.max(12, Math.min(r.left + 14, innerWidth - Math.min(440, innerWidth - 24) - 12)) : r.left + 14;
+  const artKey = coop ? 'metonic' : moon ? 'moon' : proxy && role ? 'mocha_' + f.role : u.key;
+  const ch = Engine.CHARS[u.key], col = moon ? '#d9e2ff' : ELEM_COLOR[u.elem] || '#fff', r = field.getBoundingClientRect(), art = Art.get(artKey);
+  const label = coop ? '協同攻擊' : proxy ? '代理執行' : '追加攻擊';
+  const who = coop ? '默冬章 × 月影' : moon ? '月影' : role ? '莫卡兄弟・' + role : ch.fullName || ch.name;
+  const name = lunar ? (f.name || label).replace(/^月影・/, '') : f.name || label;
+  const duration = coop ? 1.45 : proxy ? 1.05 : 1.25, maxWidth = coop ? 620 : 440;
+  const left = proxy || lunar ? Math.max(12, Math.min(r.left + 14, innerWidth - Math.min(maxWidth, innerWidth - 24) - 12)) : r.left + 14;
   const part = FB_PARTS[u.elem] || 'cut';
   const parts = Array.from({ length: 14 }, (_, i) => `<i class="fb-p ${part}" style="left:${(8 + Math.random() * 84).toFixed(0)}%;top:${(10 + Math.random() * 80).toFixed(0)}%;--dx:${((Math.random() - 0.3) * 120).toFixed(0)}px;--dy:${((Math.random() - 0.5) * 70).toFixed(0)}px;animation-delay:${(0.12 + i * 0.03).toFixed(2)}s"></i>`).join('');
   const d = document.createElement('div');
-  d.className = 'fbanner e-' + u.elem + (proxy ? ' fb-proxy ' + f.role : '');
-  d.dataset.kind = f.kind; d.dataset.art = artKey;
-  d.setAttribute('aria-label', `${label}${role ? '・' + role : ''}：${f.name || label}`);
-  d.style.cssText = `left:${left}px;top:${r.top + r.height * 0.4}px;--c:${col};animation-duration:${(duration * FXK()).toFixed(2)}s`;
-  d.innerHTML = `<div class="fb-band"></div>${parts}
-    <div class="fb-art">${art ? `<span style="${Art.bg(artKey, 'face', 260)}"></span>` : `<b>${esc(ch.name[0])}</b>`}</div>
-    <div class="fb-txt"><small>${label} · ${proxy ? 'PROXY' : 'FOLLOW-UP'}${role ? `<i class="fb-role">${role}</i>` : ''}</small><b>${esc(f.name || label)}</b><em>${esc(who)}<span>${esc(ELEM_NAME[u.elem])}</span></em></div>`;
+  d.className = 'fbanner e-' + u.elem + (proxy ? ' fb-proxy ' + f.role : '') + (lunar ? ' fb-lunar ' + (coop ? 'fb-coop' : 'fb-moon') : '');
+  d.dataset.kind = f.kind; d.dataset.art = coop ? 'moon+metonic' : artKey;
+  d.setAttribute('aria-label', `${label}${role ? '・' + role : ''}：${name}，${who}`);
+  d.style.cssText = `left:${left}px;top:${r.top + r.height * 0.4}px;--c:${col};animation-duration:${(duration * FXK()).toFixed(2)}s;--entry:${(0.38 * FXK()).toFixed(3)}s`;
+  const moonArt = coop && Art.get('moon');
+  const portrait = coop && art && moonArt
+    ? `<div class="fb-figure fb-pair"><div class="fb-partner"><img src="${esc(moonArt.url)}" alt="月影立繪"></div><div class="fb-owner"><img src="${esc(art.url)}" alt="默冬章立繪"></div></div>`
+    : lunar && art
+    ? `<div class="fb-figure"><img src="${esc(art.url)}" alt="${esc(who)}立繪"></div>`
+    : `<div class="fb-art">${art ? `<span style="${Art.bg(artKey, 'face', 260)}"></span>` : `<b>${esc(ch.name[0])}</b>`}</div>`;
+  d.innerHTML = `<div class="fb-band"></div>${parts}${portrait}
+    <div class="fb-txt"><small>${label} · ${coop ? 'CO-OP' : proxy ? 'PROXY' : 'FOLLOW-UP'}${role ? `<i class="fb-role">${role}</i>` : ''}</small><b>${esc(name)}</b><em>${esc(who)}<span>${esc(ELEM_NAME[u.elem])}</span></em></div>`;
   $('#fx').appendChild(d);
   setTimeout(() => d.remove(), (duration * 1000 + 50) * FXK() + 100);
 }
@@ -964,7 +996,7 @@ function cashBanner(f) {
   $('#fx').appendChild(d);
   setTimeout(() => d.remove(), 1200 * FXK() + 100);
 }
-const ELEM_COLOR = { phys: '#dfe4f0', fire: '#ff8a4c', water: '#4fa8ff', wind: '#5fe3a8', thunder: '#b48cff', ice: '#7fd4ff', grass: '#7ed957', luck: '#ffd36a', space: '#8fb4ff', joy: '#ffc0d8', anger: '#ff5a5a', sorrow: '#9fa8e0', mirth: '#ffe07a', imag: '#c9a0ff' };
+const ELEM_COLOR = { phys: '#dfe4f0', fire: '#ff8a4c', water: '#4fa8ff', wind: '#5fe3a8', thunder: '#b48cff', ice: '#7fd4ff', grass: '#7ed957', luck: '#ffd36a', space: '#8fb4ff', time: '#d8bb8c', joy: '#ffc0d8', anger: '#ff5a5a', sorrow: '#9fa8e0', mirth: '#ffe07a', imag: '#c9a0ff' };
 
 function fx(f) {
   const s = f.src ? cardEl(f.src) : null;
@@ -1008,10 +1040,31 @@ function fx(f) {
     case 'proxy':
       if (f.role === 'younger') budgetFx(s, f);   // 代理執行-弟：浮報的預算單據飛向全隊，換成精銳的軍階
     // falls through
+    case 'coop':
     case 'follow': addCls(s, 'lunge'); followBanner(f); Sound.play('ultReady', { gap: 200 }); break;
     case 'contract': contractFx(s, t, f); break;   // 莫卡兄弟：遞出契約、蓋上印記
     case 'barrier': barrierFx(s, f); break;        // 阿蘭：為全隊展開護盾
     case 'phase': phaseFx(f, s); break;   // 首領轉階段
+    case 'winter': metonicChargeFx(s, f, false); break;
+    case 'springLose': metonicChargeFx(s, f, true); break;
+    case 'moonSummon': {   // 月影現身：月光從默冬章身上升起，化成浮在卡片旁的一彎月
+      if (s) { const b = center(s); burst({ x: b.x, y: b.r.top + b.r.height * 0.4 }, 'moonflare', '#d9e2ff', 0.7); floatText(s, '月影', 'escort'); }
+      Sound.play('moonSummon');
+      break;
+    }
+    case 'moonGone': if (s) { const b = center(s); burst({ x: b.r.left + 14, y: b.r.top + b.r.height * 0.45 }, 'ripple', '#d9e2ff', 0.6); } break;
+    case 'reunite':        // 重逢：兩彎月合成滿月一閃
+      if (s) { const b = center(s); burst({ x: b.x, y: b.r.top + b.r.height * 0.4 }, 'fullmoon', '#fff4d8', 0.9); floatText(s, '重逢', 'escort'); }
+      Sound.play('reunite');
+      break;
+    case 'spring':         // 冬去春來：得到時櫻花雨灑下、離開時花瓣散去
+      if (s) {
+        const b = center(s);
+        for (let i = 0; i < (f.on ? 14 : 6); i++) fxDiv('sakura-pt', b.r.left + Math.random() * b.r.width, b.r.top - 20 - Math.random() * 40, `--dx:${(Math.random() * 60 - 30).toFixed(0)}px;--dy:${(60 + Math.random() * 40).toFixed(0)}px;--rot:${(Math.random() * 400 - 200) | 0}deg;animation-delay:${(i * 45 * FXK()) | 0}ms;animation-duration:${1.1 * FXK()}s`, 1500);
+        floatText(s, f.on ? '冬去春來' : '春盡', 'escort');
+      }
+      if (f.on) Sound.play('reunite');
+      break;
     case 'cleanse': if (t) { addCls(t, 'cleanse'); floatText(t, '負面效果清除', 'shield'); burst(center(t), 'ripple', '#e8f0ff', 0.6); } break;   // 轉階段淨化
     case 'av': avArrow(f); break;          // 行動值改變：行動條上的箭頭
     case 'wanted':   // 通緝層數變化
@@ -1137,6 +1190,12 @@ const BUFF_INFO = {
   '後勤支援': ['增益', '亞歷山卓額外能力一：我方發動追加攻擊時獲得，每層攻擊力 +17%，最多 2 層，持續整場戰鬥。'],
   '度量': ['增益', '寒夜［校準任務·度量］提供。每層使寒夜每次獲得刻度時額外 +1 層，最多 3 層。'],
   '構築': ['增益', '寒夜終結技提供，持續到下次施放戰技後。戰技無視敵人 15% 防禦力，且每段彈射有 50% 機率直接彈向帶有［樣本］的敵人。'],
+  '圓缺': ['增益', '金句《十九年後的同一輪月》性相層：每次發動追加攻擊獲得 1 層，每層使下一次普攻的傷害提高，最多 3 層，施放普攻後移除。'],
+  '朔望': ['增益', '金句《十九年後的同一輪月》權能層：時間織機每執行一份校準任務獲得 1 層，每層使攻擊力提高，最多 7 層；單次執行 3 份以上時行動提前。'],
+  '冬去春來': ['增益', '默冬章終結技進入，持續到春全數消耗。期間無法獲得冬；自身與月影暴擊傷害 +38%，普攻替換為強化普攻；每次失去春，施放追加攻擊「春雷」（19% × 失去的層數）。'],
+  '重逢': ['增益', '月影被延後累計達 100% 而消失時獲得。下一次戰技不消耗戰技點。'],
+  '補闕': ['增益', '［校準優化·補闕］：默冬章得到或離開冬去春來時獲得。每層使默冬章造成的傷害 +2%，最多 3 層，持續 5 回合。'],
+  '舉正於中': ['增益', '默冬章額外能力二：月影第一次被延後超過 50% 時獲得。下一次攻擊暴擊率 +49%，攻擊後移除。'],
 };
 const ST_INFO = {
   lacer: ['裂傷', '持續傷害', '龍爪、O.T.G. 施加（O.T.G. 也會施加在自己身上，在自己的回合開始時結算）。每層在該敵人回合開始時造成最大生命 16% 的物理持續傷害（不超過龍爪攻擊力 120%），每層各自持續 2 回合。結算後，依結算層數 × 50% 轉為血破（至少 1 層）。'],
@@ -1165,6 +1224,10 @@ const ST_INFO = {
   mourn: ['悲悼', '持續傷害', '米勒施加的哀屬性持續傷害，每個獨立計算階段（施加時為第一階段）。敵人回合開始時造成米勒生命值上限 ×（30% + 階段 × 15%）的傷害，然後推進一個階段；第三階段結算後消失。同一目標最多 3 個（陰雨連綿 +1）；滿額後再次成功施加時，額外觸發一次最高階段的悲悼（不推進階段、不消除）。額外能力二：第一次結算時不推進階段。'],
   funeral: ['葬禮', '領域', '米勒終結技展開。進入米勒回合時持續時間 −1，歸零時消除。期間米勒回合行動時，星流向當前傾向推動 10%；星流為中節時，改為使戰技的推動值 +5%。敵方全體帶有［回響］。'],
   stun: ['禁錮', '控制', '束縛者施加。跳過下一個回合。「壁壘」可抵抗。'],
+  winter: ['冬', '資源', '默冬章的資源（上限 19 層）。時間織機每投入或執行一份校準任務 +1 層；滿 19 層可施放終結技（能量環顯示冬）。冬去春來期間無法獲得。'],
+  spring: ['春', '資源', '默冬章終結技把 19 層冬轉成 19 層春。冬去春來期間，時間織機每投入或執行一份校準任務失去 1 層春，每次失去都會觸發追加攻擊「春雷」；春用完時冬去春來結束。'],
+  moonmark: ['水中月', '標記', '默冬章與月影的普攻施加，只對最新的目標生效。每次受到我方攻擊後，額外受到默冬章攻擊力 12% 的時屬性附加傷害；月影、春雷優先攻擊它。默冬章施放終結技時消失，換成一次 7 層的春雷。'],
+  moon: ['月影', '召喚物', '默冬章的戰技或強化普攻召喚。速度與默冬章相同，不會成為敵人的目標；輪到它時自動施放普攻（冬去春來中為強化普攻），視為追加攻擊，優先打水中月。默冬章的行動值改變時同步改變；被延後累計達 100% 時消失，默冬章獲得「重逢」。'],
   adv: ['待拉條', '狀態', '在自己回合中獲得的行動提前，會在本回合結束、行動值重置後才生效。'],
 };
 /* ---------- 狀態小圖標 ----------
@@ -1230,6 +1293,12 @@ const GLYPH = {
   hide: '<path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><path d="M4 4l16 16"/>',
   heal: '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
   dotup: '<path d="M10 4s5 6 5 10a5 5 0 0 1-10 0c0-4 5-10 5-10z"/><path d="M19 4v6M16 7h6"/>',
+  snow: '<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7"/><path d="M9 4l3 2 3-2M9 20l3-2 3 2M4 10.5l3-.4 .4-3M20 13.5l-3 .4-.4 3M4 13.5l3 .4.4 3M20 10.5l-3-.4-.4-3"/>',
+  blossom: '<circle cx="12" cy="12" r="2.4"/><path d="M12 9.6c-1.6-3.6.4-6 0-6s1.6 2.4 0 6M14.3 11.3c3.3-2.2 6-.7 5.8-1s-2.2 2.2-5.8 1M13.4 14c2.2 3.2.4 6 .8 5.8s-.2-3-0.8-5.8M10.6 14c-2.2 3.2-.4 6-.8 5.8s.2-3 .8-5.8M9.7 11.3c-3.3-2.2-6-.7-5.8-1s2.2 2.2 5.8 1"/>',
+  crescent: '<path d="M15 3a9 9 0 1 0 6 15.5A7.5 7.5 0 0 1 15 3z"/>',
+  moonwater: '<path d="M14 3a6 6 0 1 0 4.5 10A5 5 0 0 1 14 3z"/><path d="M3 18c2-1.4 4-1.4 6 0s4 1.4 6 0 4-1.4 6 0M5 21.5c1.5-1 3-1 4.5 0s3 1 4.5 0 3-1 4.5 0"/>',
+  reunion: '<path d="M9 4a8 8 0 1 0 0 16 6.5 6.5 0 0 1 0-16zM15 4a8 8 0 1 1 0 16 6.5 6.5 0 0 0 0-16z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/><circle cx="12" cy="12" r="6.5"/>',
 };
 // 特殊狀態：名稱 → [圖示, 給予者]（給予者決定底色的屬性）
 const SPECIAL_BUFF = {
@@ -1242,6 +1311,7 @@ const SPECIAL_BUFF = {
   '實戰演練': ['note', 'mark'], '知悉': ['eye', 'mark'], '流轉·跬步': ['swirl', 'mark'], '流轉·循序': ['swirl', 'mark'], '流轉·而勝': ['swirl', 'mark'], '斂藏': ['drop', 'mark'],
   '度量': ['ruler', 'hanye'], '構築': ['grid', 'hanye'],
   '執法權限': ['badge', 'raiden'],
+  '冬去春來': ['blossom', 'metonic'], '重逢': ['reunion', 'metonic'], '補闕': ['gear', 'metonic'], '舉正於中': ['crescent', 'metonic'],
 };
 // 角色機制的狀態（不在 buffs 裡）：s:key → [圖示, 給予者 或 null（常規）, 是否為資源]
 const SPECIAL_ST = {
@@ -1250,9 +1320,10 @@ const SPECIAL_ST = {
   phase2: ['two', 'raiden'], duel: ['chain', 'otg'], suffer: ['cross', 'otg', 1], mourn: ['tear', 'miller'], funeral: ['umbrella', 'miller'],
   proxy: ['stamp', 'mocha'], mark: ['stamp', 'mocha'], tacit: ['link', 'mocha', 1], cover: ['scope', 'alan', 1], model: ['model', 'mark'], exp: ['book', 'mark', 1], siren: ['siren', 'alexandra', 1],
   stun: ['lock', null], broken: ['shieldbreak', null], adv: ['ff', null],
+  winter: ['snow', 'metonic', 1], spring: ['blossom', 'metonic'], moonmark: ['moonwater', 'metonic'],
 };
 // 金句、妙具給的效果一律走常規模板：沒有數值欄位的，依實際效果指定圖示
-const REG_NAME = { '流動資本': 'sword', '鎖定': 'burst', '罪證確鑿': 'star', '附加條款': 'sword', '不退讓': 'shield', '封鎖': 'shieldbreak', '受難': 'burst', '開道': 'burst',
+const REG_NAME = { '圓缺': 'burst', '朔望': 'sword', '流動資本': 'sword', '鎖定': 'burst', '罪證確鑿': 'star', '附加條款': 'sword', '不退讓': 'shield', '封鎖': 'shieldbreak', '受難': 'burst', '開道': 'burst',
   '利滾利': 'dotup', '履約保證': 'sword', '整理筆記': 'burst', '雨聲': 'dotup', '草稿': 'star', '讓路': 'wing', '演算': 'star' };
 // 常規模板：依效果的主要數值挑圖示
 const REG_STAT = [['atkPct', 'sword'], ['atkFlat', 'sword'], ['dmgBonus', 'burst'], ['cr', 'star'], ['cd', 'star'], ['dmgTakenUp', 'shieldbreak'], ['defRed', 'shield'], ['dmgTakenRed', 'shield'],
@@ -1487,6 +1558,7 @@ function enemyUnit(e, W, S) {
   if (e.flagrant) c.push(statusChip('flagrant', '現行犯 · 收網就緒（實心）', { hot: true, solid: true }));
   else if (e.peek) c.push(statusChip('peek', '管中窺豹（空心）'));
   if (e.sample) c.push(statusChip('sample', '樣本'));
+  if (e.moonMark) c.push(statusChip('moonmark', '水中月'));
   if (e.type === 'raiden' && e.phase2) c.push(statusChip('phase2', '二階段'));
   if (W.duel && W.duel.id === e.id) c.push(statusChip('duel', `生死角力（剩 ${W.duel.dur} 回合）`, { turns: W.duel.dur }));
   if (e.mourn && e.mourn.length) c.push(statusChip('mourn', `悲悼 ×${e.mourn.length}（階段 ${e.mourn.map(m => m.st).join('·')}）`, { stack: e.mourn.length }));
@@ -1554,7 +1626,7 @@ function popArt(key, art, blas) {
   const fy = art.face[1], by = art.bust ? Math.max(art.bust[1], fy + 0.05) : fy + 0.2;
   const top = art.top != null ? Math.min(art.top, fy) : Math.max(0, fy - 0.6 * (by - fy));
   const waist = Math.min(1, by + 1.1 * (by - fy));
-  const sc = (POP_H - POP_PAD) / Math.max(40, (waist - top) * art.h), H = art.h * sc;
+  const sc = (POP_H - POP_PAD) / Math.max(40, (waist - top) * art.h) * (key === 'metonic' ? 1.20 : 1), H = art.h * sc;
   const y = POP_PAD - top * H, left = art.face[0] * art.w * sc;
   // 瀆神之軀：動畫的起點依目前時間推算（畫面更新時接續播放，不會重頭開始）
   const back = blas ? `<div class="bl-aura back"><i class="glow" style="${syncAnim(1400)}"></i><i class="ring" style="${syncAnim(6000)}"></i><i class="cross" style="${syncAnim(1400)}"></i></div>` : '';
@@ -1573,6 +1645,42 @@ function wantedMark(n) {
   const lv = n >= 9 ? 'crit' : n >= 6 ? 'hot' : '';
   return `<div class="wanted-mark ${lv}" data-st="s:wanted" title="通緝 ${n} 層${n >= 9 ? '：將被重罪處決' : n >= 6 ? '：將被緝捕' : ''}"><small>WANTED</small><b>${n}</b></div>`;
 }
+/** 默冬章的終結技圖標：19 段的默冬環（十九年一章）。平時以冰藍點亮「冬」，冬去春來中改為花色的「春」並逐段熄滅；
+ *  中央是安提基特拉機械的齒輪（轉速依目前時間推算，畫面更新時接續轉動，不會重播）。 */
+function metonicChargeMarkup(a) {
+  const sp = a.buffs.some(b => b.name === '冬去春來'), n = Math.max(0, Math.min(19, sp ? a.spring || 0 : a.winter || 0));
+  const pt = deg => [40 + 33 * Math.cos(deg * Math.PI / 180), 40 + 33 * Math.sin(deg * Math.PI / 180)].map(v => v.toFixed(2)).join(' ');
+  const segs = Array.from({ length: 19 }, (_, i) => { const a0 = -90 + i * 360 / 19 + 3, a1 = a0 + 360 / 19 - 6; return `<path class="met-seg${i < n ? ' lit' : ''}" d="M ${pt(a0)} A 33 33 0 0 1 ${pt(a1)}"/>`; }).join('');
+  const teeth = Array.from({ length: 12 }, (_, i) => { const t = i * 30 * Math.PI / 180; return `M ${(40 + Math.cos(t) * 15).toFixed(2)} ${(40 + Math.sin(t) * 15).toFixed(2)} L ${(40 + Math.cos(t) * 19).toFixed(2)} ${(40 + Math.sin(t) * 19).toFixed(2)}`; }).join(' ');
+  return `<svg class="met-dial" viewBox="0 0 80 80" aria-hidden="true"><circle class="met-orbit" cx="40" cy="40" r="39"/>${segs}
+      <g class="met-gear" style="${syncAnim(sp ? 6000 : n >= 19 ? 3000 : 12000)};animation-duration:${sp ? 6 : n >= 19 ? 3 : 12}s"><circle cx="40" cy="40" r="15"/><path d="${teeth}"/><circle cx="40" cy="40" r="5"/></g></svg>
+    <span class="met-count" aria-hidden="true"><small>${sp ? '春' : '冬'}</small><b>${n}</b></span>`;
+}
+/** 冬的獲得：雪點從四周聚進圖標；春的失去：櫻花瓣從圖標散開 */
+function metonicChargeFx(src, f, spring) {
+  const card = src && src.querySelector('.met-charge');
+  if (!card) return;
+  const b = center(card), k = FXK();
+  if (spring) {
+    for (let i = 0; i < Math.min(8, 2 + f.n * 2); i++) fxDiv('sakura-pt', b.x, b.y, `--dx:${(Math.random() * 90 - 45).toFixed(0)}px;--dy:${(30 + Math.random() * 40).toFixed(0)}px;--rot:${(Math.random() * 400 - 200) | 0}deg;animation-duration:${0.9 * k}s;animation-delay:${(i * 30 * k) | 0}ms`, 1100);
+    addCls(card, 'met-pulse');
+    return;
+  }
+  for (let i = 0; i < Math.min(10, 3 + f.n * 2); i++) {
+    const a = Math.random() * Math.PI * 2, d = 46 + Math.random() * 30;
+    fxDiv('snowmote', b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, `--dx:${(-Math.cos(a) * d).toFixed(0)}px;--dy:${(-Math.sin(a) * d).toFixed(0)}px;animation-duration:${0.55 * k}s;animation-delay:${(i * 35 * k) | 0}ms`, 800);
+  }
+  later(() => addCls(card, f.full ? 'met-full' : 'met-pulse'), 380);
+}
+/** 默冬章的月影：位於角色卡左下角的月影小立繪；外圈是被延後的累計量（滿一圈＝重逢） */
+function moonToken(W, a) {
+  const m = (W.units || []).find(u => u.side === 'summon' && u.key === 'moon' && u.alive && u.owner === a.id);
+  if (!m) return '';
+  const p = Math.min(1, m.delayAcc || 0);
+  const art = Art.get('moon');
+  return `<div class="moon-token${art ? ' moon-mini' : ''}" data-uid="${m.id}" data-st="s:moon" title="月影：被延後累計 ${Math.round(p * 1000) / 10}%（滿 100% 時消失，觸發重逢）" style="--p:${(p * 360).toFixed(1)}deg">
+    ${art ? `<img src="${esc(art.url)}" alt="月影" draggable="false">` : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3a9 9 0 1 0 6 15.5A7.5 7.5 0 0 1 15 3z"/></svg>'}</div>`;
+}
 function allyCard(a, W, S, idx) {
   const c = [];
   if (a.mark) c.push(W.proxy === a.id ? statusChip('proxy', `被代理人［${a.mark}］`, { hot: true }) : statusChip('mark', `印記［${a.mark}］`));
@@ -1589,6 +1697,11 @@ function allyCard(a, W, S, idx) {
     c.push(statusChip('ticks', `刻度 ${a.ticks || 0}`, { stack: a.ticks || 0, hot: a.ticks >= 8 }));
     if (a.spreadReady) c.push(statusChip('spread', '擴散就緒', { hot: true }));
     if (a.recurBonus) c.push(statusChip('recur', '遞推 +5', { hot: true }));
+  }
+  if (a.key === 'metonic') {
+    const sp = a.buffs.some(b => b.name === '冬去春來');
+    if (sp) c.push(statusChip('spring', `春 ${a.spring || 0}/19`, { stack: a.spring || 0 }));
+    else c.push(statusChip('winter', `冬 ${a.winter || 0}/19`, { stack: a.winter || 0, hot: (a.winter || 0) >= 19 }));
   }
   if (a.key === 'otg') {
     c.push(statusChip('suffer', `苦難 ${a.suffer || 0}/12`, { stack: a.suffer || 0, hot: (a.suffer || 0) >= 9 }));
@@ -1607,16 +1720,17 @@ function allyCard(a, W, S, idx) {
   const blas = a.key === 'otg' && a.buffs.some(b => b.name === '瀆神之軀');
   const cls = ['card', 'ally', 'el-' + a.elem, art ? 'has-art breakout' : '', blas ? 'blasphemy' : '', a.alive ? '' : 'dead', S.allyTarget === a.id ? 'sel' : '', W.current === a.id && !armed ? 'acting' : '', isArmed ? 'armed' : ''].join(' ');
   const otg = a.key === 'otg', blocked = otg && a.buffs.some(b => b.name === '瀆神之軀');
-  const orb = ['ultorb', otg ? 'otg-charge' : '', blocked ? 'suffer-locked' : '', full ? 'ready' : '', isArmed ? 'arm' : '', queued ? 'queued' : ''].join(' ');
-  const lbl = queued ? '預約中' : isArmed ? '再按發動' : otg ? blocked ? `瀆神之軀 剩 ${a.buffs.find(b => b.name === '瀆神之軀').dur} 回合` : full ? `終結技${a.suffer > 9 ? ' · 餘蓄 ' + (a.suffer - 9) : ''}` : `${a.suffer || 0}/9` : full ? '終結技' : `${Math.floor(enP * 100)}%`;
+  const met = a.key === 'metonic', metSp = met && a.buffs.some(b => b.name === '冬去春來');
+  const orb = ['ultorb', otg ? 'otg-charge' : '', met ? 'met-charge' : '', metSp ? 'met-spring' : '', blocked ? 'suffer-locked' : '', full ? 'ready' : '', isArmed ? 'arm' : '', queued ? 'queued' : ''].join(' ');
+  const lbl = queued ? '預約中' : isArmed ? '再按發動' : met && !full ? (metSp ? `春 ${a.spring || 0}` : `冬 ${a.winter || 0}/19`) : otg ? blocked ? `瀆神之軀 剩 ${a.buffs.find(b => b.name === '瀆神之軀').dur} 回合` : full ? `終結技${a.suffer > 9 ? ' · 餘蓄 ' + (a.suffer - 9) : ''}` : `${a.suffer || 0}/9` : full ? '終結技' : `${Math.floor(enP * 100)}%`;
   const resourceTip = otg ? blocked ? `瀆神之軀剩餘 ${a.buffs.find(b => b.name === '瀆神之軀').dur} 回合（期間無法獲得苦難；目前苦難 ${a.suffer || 0}/12）` : `苦難 ${a.suffer || 0}/12，9 點可施放，消耗後保留餘蓄` : `能量 ${a.energy.toFixed(0)}/${a.maxEnergy}`;
   return `<div class="${cls}" data-ally="${a.id}" data-uid="${a.id}" style="--elem:${ELEM_HEX[a.elem]}">
     ${art ? `<div class="art art-bg"></div>${popArt(a.key, art, blas)}<div class="art-shade"></div>` : ''}${blas ? bloodHalo() : ''}
-    ${a.wanted ? wantedMark(a.wanted) : ''}
+    ${a.wanted ? wantedMark(a.wanted) : ''}${met ? moonToken(W, a) : ''}
     ${isArmed ? particles() : ''}
     <button class="${orb}" data-ult="${a.id}" ${canPress ? '' : 'disabled'} aria-label="${esc(a.name)} 終結技，${resourceTip}，${lbl}" title="終結技【${esc(Engine.CHARS[a.key].actions.ult)}】${resourceTip}（鍵盤 ${idx + 1}）"
       style="--en:${en.from}" data-twp="--en" data-tw="${en.to}">
-      <span class="orb-face" style="${art ? Art.bg(a.key, 'face', 380) : ''}"></span>${otg ? sufferChargeMarkup(a) : '<span class="orb-ring"></span>'}<span class="orb-lbl">${lbl}</span>
+      <span class="orb-face" style="${art ? Art.bg(a.key, 'face', 380) : ''}"></span>${otg ? sufferChargeMarkup(a) : met ? metonicChargeMarkup(a) : '<span class="orb-ring"></span>'}<span class="orb-lbl">${lbl}</span>
     </button>
     <div class="nm"><span>${esc(a.name)}</span><span class="tag">${ELEM_NAME[a.elem]}</span></div>
     <div class="bar hp"><i ${barAttr('ahp:' + a.id, Math.max(0, a.hp / a.maxHp * 100))}></i></div>
@@ -1642,7 +1756,7 @@ function previewNow(S) {
   } else if (pv && pv.kind && S.phase === 'input' && cur && cur.side === 'ally') {
     action = pv.kind;
     if (action === 'skill' && !Engine.canSkill()) return null;
-    const enh = (cur.key === 'kane' && Engine.kaneEnhanced(S.units)) || (cur.key === 'alan' && cur.cover > 0);
+    const enh = (cur.key === 'kane' && Engine.kaneEnhanced(S.units)) || (cur.key === 'alan' && cur.cover > 0) || (cur.key === 'metonic' && cur.buffs.some(b => b.name === '冬去春來'));
     label = action === 'skill' ? '戰技' : enh ? '強化普攻' : '普攻';
     if (action === 'skill' && Engine.CHARS[cur.key].skillTarget !== 'enemy') target = null;
   } else return null;
@@ -1680,6 +1794,8 @@ document.addEventListener('pointerout', ev => {
 
 /* ---------- 時間織機面板（平衡權能） ---------- */
 const TASK_DESC = {
+  leap: '默冬章戰技投入。啟動時執行並消除：月影的行動值延遲量 +28.6%；若有敵人帶著水中月，對其與相鄰目標造成默冬章攻擊力 95% 的時屬性傷害。',
+  precess: '［校準優化·補闕］投入（默冬章得到或離開冬去春來時）。啟動時執行並消除：我方全體行動提前 14.3%。',
   up: '啟動時股市上漲一階，隨後消除。', down: '啟動時股市下跌一階，隨後消除。',
   long: '［校準優化·利潤］在上漲區間轉變而成。啟動時股市上漲一階，並對敵方全體造成戈登攻擊力 30% × 當前上漲階數的運屬性傷害，隨後消除。', short: '［校準優化·利潤］在下跌區間轉變而成。啟動時股市下跌一階，並為戈登恢復 5 × 當前下跌階數的能量，隨後消除。',
   cash: '常駐任務（3 次）。每次執行：10 段彈射，每段對隨機敵人造成戈登攻擊力 25% 的運屬性傷害，戈登行動提前 30%。次數歸零時重新獲得利潤。', bottom: '常駐任務（3 次）。每次執行：我方全體獲得［財源滾滾］，回復 2 個戰技點，戈登行動提前 30%。次數歸零時重新獲得利潤。',
@@ -1695,17 +1811,18 @@ function renderLoom(S, W) {
   el.classList.toggle('hidden', !L);
   if (!L) return;
   const cap = Engine.loomCap(), used = L.tasks.filter(x => !Engine.TASK_FREE.has(x.kind)).length;
-  const can = !playing && Engine.canLoom();
+  const can = !ENDED.includes(S.phase) && (loomQueued || (L.charge >= 1 - 1e-9 && Engine.canLoom()));
   const chips = L.tasks.map(x => `<span class="lm-task t-${x.kind}${x.profit ? ' profit' : ''}${Engine.TASK_FREE.has(x.kind) ? ' perm' : ''}" title="校準任務·${Engine.TASK_NAME[x.kind]}：${TASK_DESC[x.kind] || ''}">${Engine.TASK_NAME[x.kind]}${x.left != null ? `<i>剩 ${x.left}</i>` : ''}</span>`).join('')
     || '<span class="lm-empty">沒有校準任務</span>';
   const conv = (W.units || S.units).some(u => u.side === 'ally' && u.key === 'hanye' && u.alive)
     ? '<div class="lm-profit" title="寒夜天賦：時間織機每執行一份校準任務，寒夜累積 1 層刻度、行動提前 10%；單次累計達到 40% 時，下次戰技額外 5 層刻度">校準優化·收斂</div>' : '';
   const prof = L.gordon ? `<div class="lm-profit" title="時間織機執行完所有任務後，若股市不為均衡，利潤轉變為做多（上漲）或做空（下跌）投入，隨後消失；套現／抄底次數歸零時重新獲得">校準優化·利潤：<em>${L.profit ? '持有' : '已投入'}</em></div>` : '';
+  const buque = L.buque ? '<div class="lm-profit t-buque" title="默冬章在場時獲得。默冬章得到或離開冬去春來時，投入［校準任務·歲差］，並使默冬章造成的傷害 +2%（最多 3 層，5 回合）">校準優化·補闕</div>' : '';
   el.innerHTML = `<div class="lm-head">${Icon('trace')}<b>時間織機</b><span>${used}/${cap}</span></div>
     <div class="lm-charge" title="充能 ${Engine.pct(L.charge)}（每投入一份 +50%，100% 可啟動，最多 500%）">
       <i style="width:${L.charge / 5 * 100}%"></i>${[1, 2, 3, 4].map(k => `<em style="left:${k * 20}%"></em>`).join('')}<small>${Engine.pct(L.charge)}</small></div>
-    <div class="lm-tasks">${chips}</div>${conv}${prof}
-    <button class="lm-go" data-cmd="loom" ${can ? '' : 'disabled'} title="依投入順序執行所有校準任務（不佔回合）">啟動</button>`;
+    <div class="lm-tasks">${chips}</div>${conv}${prof}${buque}
+    <button class="lm-go${loomQueued ? ' queued' : ''}" data-cmd="loom" ${can ? '' : 'disabled'} aria-pressed="${loomQueued}" title="依投入順序執行所有校準任務；行動播放中可預約插入，再按取消（不佔回合）">${loomQueued ? '已預約・點擊取消' : playing ? '預約啟動' : '啟動'}</button>`;
 }
 /* ---------- 米勒「葬禮」領域 ----------
  * 敵人身後的地面上，一道低弧度的白菊與紅罌粟圈出領域（只有後方的半圈，戰場不會被切開）；地面偶爾泛起幾圈漣漪。
@@ -2014,6 +2131,7 @@ function renderBattle() {
   const byId = id => W.units.find(u => u.id === id) || S.units.find(u => u.id === id);
   if (armed) { const a = byId(armed); if (!a || !a.alive || ENDED.includes(S.phase) || !Engine.canUlt(armed)) armed = null; }
   ultQueue = ultQueue.filter(id => Engine.canUlt(id));
+  if (ENDED.includes(S.phase) || !Engine.canLoom()) loomQueued = false;
 
   // 音效：終結技充能完成、戰鬥結束
   W.units.forEach(u => {
@@ -2035,7 +2153,9 @@ function renderBattle() {
     <b>${cyc}</b><small>輪</small><div class="bar cdbar"><i style="width:${remain / span * 100}%"></i></div><small class="tlw">${W.wave + 1}/${S.waves.length} 波</small></div>`;
   const av = u => u.side === 'ally' && Art.get(u.key)
     ? `<i class="tav" style="${Art.bg(u.key, 'face', 420)}"></i>`
-    : u.side === 'enemy' ? `<i class="tav enemy">${enemySvg(u, '32 0 56 56')}</i>` : `<i class="tav">${esc(u.name[0])}</i>`;
+    : u.side === 'enemy' ? `<i class="tav enemy">${enemySvg(u, '32 0 56 56')}</i>`
+    : u.side === 'summon' && Art.get('moon') ? `<i class="tav moon-portrait" style="${Art.bg('moon', 'face', 420)}"></i>`
+    : u.side === 'summon' ? '<i class="tav moon"><svg viewBox="0 0 24 24"><path d="M15 3a9 9 0 1 0 6 15.5A7.5 7.5 0 0 1 15 3z"/></svg></i>' : `<i class="tav">${esc(u.name[0])}</i>`;
   const item = (u, cls, val, tip, k, badge) => `<div class="tl ${u.side} ${cls}"${k ? ` data-k="${k}"` : ''} data-unit="${esc(u.id)}" title="${esc(u.name)}：${esc(tip)}">${av(u)}<span class="tl-name">${esc(u.name)}</span><b class="tlv">${val}</b>${badge || ''}</div>`;
 
   // 行動預覽：滑到普攻／戰技、蓄勢終結技、或滑到敵人身上時，行動軸改顯示「行動後」的順序
@@ -2110,13 +2230,14 @@ function renderBattle() {
   if (cur && cur.side === 'ally' && !ENDED.includes(S.phase)) {
     const ch = Engine.CHARS[cur.key];
     const kaneEnh = cur.key === 'kane' && Engine.kaneEnhanced(W.units);
-    const enh = kaneEnh || (cur.key === 'alan' && cur.cover > 0) || (cur.key === 'otg' && !!W.duel);
+    const metEnh = cur.key === 'metonic' && cur.buffs.some(b => b.name === '冬去春來');
+    const enh = kaneEnh || metEnh || (cur.key === 'alan' && cur.cover > 0) || (cur.key === 'otg' && !!W.duel);
     const lock = playing || !!armed || S.phase !== 'input';
-    const skillNote = cur.key === 'alan' && cur.cover > 0 ? '掩護中不可用' : cur.key === 'otg' && W.duel ? '角力中不可用' : '−1 點';
+    const skillNote = cur.key === 'alan' && cur.cover > 0 ? '掩護中不可用' : cur.key === 'otg' && W.duel ? '角力中不可用' : cur.freeSkill ? '重逢：免費' : '−1 點';
     skills = `<div class="actions skills el-${cur.elem}">
       <button data-act="basic" class="skillbtn ${enh ? 'enh' : ''}" ${lock ? 'disabled' : ''} title="${esc(enh ? ch.actions.enhanced : ch.actions.basic)}（Q）">
         <span class="ico">${enh ? '✸' : '⚔'}</span><span class="lbl">${enh ? '強化普攻' : '普攻'}</span>
-        <small>${esc(enh ? ch.actions.enhanced : ch.actions.basic)}</small><em>${kaneEnh ? '不回點' : '+1 點'}</em></button>
+        <small>${esc(enh ? ch.actions.enhanced : ch.actions.basic)}</small><em>${kaneEnh || metEnh ? '不回點' : '+1 點'}</em></button>
       <button data-act="skill" class="skillbtn big" ${lock || !Engine.canSkill() ? 'disabled' : ''} title="戰技·${esc(ch.actions.skill)}（E）">
         <span class="ico">✦</span><span class="lbl">戰技</span><small>${esc(ch.actions.skill)}</small><em>${skillNote}</em></button>
     </div>`;
@@ -2156,6 +2277,7 @@ function renderBattle() {
     }
   }
   if (ultQueue.length) m += `<div class="qinfo">✦ 預約：${ultQueue.map(id => esc(byId(id).name)).join('、')}（在最近的回合前或行動後窗口發動）</div>`;
+  if (loomQueued) m += '<div class="qinfo">◈ 時間織機已預約（在最近的回合前或行動後窗口發動）</div>';
   if (playing) m += `<div class="midbtns"><button data-cmd="skip" class="ghostbtn">⏭ 跳過動畫</button></div>`;
   mid.innerHTML = m;
 
@@ -2192,12 +2314,87 @@ function sparks(p, col, n, dist) {
   }
 }
 function burst(p, cls, col, dur) { fxDiv(cls, p.x, p.y, `--c:${col};animation-duration:${dur * FXK()}s`, dur * 1000 + 50); }
+/** 金銀光：一道光柱從天上傾瀉到 p，頭先落地、尾巴隨後收進地面；r＝傾斜角（負＝從左上方來） */
+function skyFall(p, col, r, sc) {
+  const k = FXK(), h = Math.max(220, p.y + 30);
+  fxDiv('skyfall', p.x, p.y + 12, `--c:${col};--r:${r}deg;--h:${h}px;--w:${(14 * sc).toFixed(0)}px;animation-duration:${0.34 * k}s`, 420);
+  [-1, 1].forEach((o, i) => fxDiv('skyfall thin', p.x + o * (8 + Math.random() * 10) * sc, p.y + 12, `--c:${col};--r:${r}deg;--h:${h}px;--w:3px;animation-delay:${((30 + i * 40) * k) | 0}ms;animation-duration:${0.3 * k}s`, 500));
+}
+/** 強化普攻的最後一段：一朵櫻花在目標身上綻開，花瓣隨後散落 */
+function sakuraBloom(p) {
+  const k = FXK();
+  const d = fxDiv('sakura', p.x, p.y, `animation-duration:${1.15 * k}s`, 1250);
+  d.innerHTML = `<svg viewBox="-60 -60 120 120" aria-hidden="true">${[0, 1, 2, 3, 4].map(i => `<g transform="rotate(${i * 72})"><path class="sk-pt" style="animation-delay:${(i * 45 * k) | 0}ms" d="M0-7C-16-15-20-38-8-50L0-43 8-50C20-38 16-15 0-7Z"/><path class="sk-vein" d="M0-9V-38"/></g>`).join('')}${Array.from({ length: 10 }, (_, i) => `<g transform="rotate(${i * 36 + 18})"><path class="sk-st" d="M0-6V-19"/><circle class="sk-an" cy="-20" r="2.2"/></g>`).join('')}<circle class="sk-core" r="7"/></svg>`;
+  burst(p, 'moonflare', '#ffc6dc', 0.6);
+  fxDiv('groundring', p.x, p.y + 40, `--w:220px;--c:#ffb3cf;animation-duration:${0.6 * k}s`, 700);
+  for (let i = 0; i < 16; i++) {
+    const a = Math.random() * Math.PI * 2, v = 50 + Math.random() * 70;
+    fxDiv('sakura-pt', p.x, p.y, `--dx:${(Math.cos(a) * v).toFixed(0)}px;--dy:${(Math.sin(a) * v * 0.6 + 50).toFixed(0)}px;--rot:${(Math.random() * 540 - 270) | 0}deg;animation-delay:${((380 + Math.random() * 200) * k) | 0}ms;animation-duration:${1.0 * k}s`, 1700);
+  }
+  Sound.play('sakuraBloom');
+}
+/** 鋸齒狀的閃電路徑（a → b），jit＝橫向抖動量 */
+function boltPath(a, b, n, jit) {
+  const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L, pts = [a];
+  for (let i = 1; i < n; i++) { const u = i / n, j = (Math.random() * 2 - 1) * jit * Math.sin(u * Math.PI); pts.push({ x: a.x + dx * u + nx * j, y: a.y + dy * u + ny * j }); }
+  pts.push(b);
+  return pts;
+}
+const ptsD = pts => 'M' + pts.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('L');
+function boltSvg(cls, paths, life) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  el.setAttribute('class', cls); el.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`); el.setAttribute('aria-hidden', 'true');
+  el.style.setProperty('--k', FXK());
+  el.innerHTML = paths.map(d => `<path class="sb-glow" d="${d}"/><path class="sb-core" d="${d}"/>`).join('');
+  $('#fx').appendChild(el);
+  setTimeout(() => el.remove(), life * FXK());
+  return el;
+}
+/** 春雷：天空一亮，一道青白的雷從畫面上方劈到 p（帶兩條分岔），落點炸開、櫻花瓣被震得往上飛 */
+function springBolt(p, sc, quiet) {
+  const k = FXK(), top = { x: p.x + (Math.random() * 120 - 60), y: -20 };
+  const main = boltPath(top, p, 12, 34 * sc), paths = [ptsD(main)];
+  [3, 6].forEach(i => { const o = main[i], dir = Math.random() < 0.5 ? -1 : 1; paths.push(ptsD(boltPath(o, { x: o.x + dir * (60 + Math.random() * 60) * sc, y: o.y + (70 + Math.random() * 60) * sc }, 5, 14 * sc))); });
+  boltSvg('spring-bolt' + (sc < 1 ? ' small' : ''), paths, 600);
+  if (!quiet) fxDiv('skyflash', 0, 0, `--x:${p.x}px;--y:${p.y}px;animation-duration:${0.45 * k}s`, 500);
+  setTimeout(() => {
+    burst(p, 'boom', '#9ff2c8', 0.4 * sc + 0.1); sparks(p, '#e9fff4', 12, 70 * sc);
+    fxDiv('groundring', p.x, p.y + 38, `--w:${(200 * sc) | 0}px;--c:#9ff2c8;animation-duration:${0.45 * k}s`, 550);
+    for (let i = 0; i < 8 * sc; i++) fxDiv('sakura-pt', p.x + (Math.random() * 60 - 30), p.y + 20, `--dx:${(Math.random() * 140 - 70).toFixed(0)}px;--dy:${(-60 - Math.random() * 70).toFixed(0)}px;--rot:${(Math.random() * 540 - 270) | 0}deg;animation-duration:${0.9 * k}s`, 1000);
+  }, 60 * k);
+}
+/** 春雷的擴散：從主目標橫向跳到相鄰目標的電弧 */
+function arcBolt(a, b) { boltSvg('spring-bolt small', [ptsD(boltPath(a, b, 9, 26))], 450); }
+/**
+ * 莫卡兄弟的水管：以 pv 為支點、長 len 的水管從 r0 掄到 r1（0°＝朝右、順時針為正）。
+ * 回傳每個點 pts[i] 被掃到的時間（毫秒，已含倍速）。動畫在 30%～75% 之間等速旋轉。
+ */
+function pipeSwing(pv, len, r0, r1, dur, pts, cls) {
+  const k = FXK();
+  const d = fxDiv('pipe' + (cls ? ' ' + cls : ''), pv.x, pv.y, `--len:${len.toFixed(0)}px;--r0:${r0}deg;--r1:${r1.toFixed(1)}deg;animation-duration:${dur * k}s`, dur * 1000 + 60);
+  d.innerHTML = '<i class="pp-body"></i><i class="pp-joint"></i><i class="pp-cap"></i><i class="pp-drip"></i>';
+  fxDiv('pipetrail' + (cls ? ' ' + cls : ''), pv.x, pv.y, `--len:${len.toFixed(0)}px;--a0:${r0 + 90}deg;--span:${(r1 - r0).toFixed(1)}deg;animation-delay:${(dur * 0.3 * 1000 * k) | 0}ms;animation-duration:${dur * 0.7 * k}s`, dur * 1000 + 60);
+  Sound.play('pipeSwing');
+  return pts.map(p => {
+    const ang = Math.atan2(p.y - pv.y, p.x - pv.x) * 180 / Math.PI;
+    const u = Math.max(0, Math.min(1, (ang - r0) / (r1 - r0)));
+    return (0.30 + 0.45 * u) * dur * 1000 * k;
+  });
+}
+/** 管口甩出的水珠：先是水色，飛出去時凍成冰晶 */
+function iceSpray(p, sc) {
+  const k = FXK();
+  for (let i = 0; i < 7 * sc; i++) {
+    const a = (-60 + Math.random() * 80) * Math.PI / 180, v = (50 + Math.random() * 60) * sc;
+    fxDiv('droplet', p.x, p.y, `--dx:${(Math.cos(a) * v).toFixed(0)}px;--dy:${(Math.sin(a) * v).toFixed(0)}px;--rot:${(Math.random() * 360) | 0}deg;animation-duration:${(0.5 + Math.random() * 0.2) * k}s`, 750);
+  }
+}
 function shakeField(big) { addCls($('.field'), big ? 'shake2' : 'shake'); }
 
 function attackFx(f, s, t) {
   const W = viewState();
   const src = (W.units || []).find(u => u.id === f.src) || Engine.state().units.find(u => u.id === f.src);
-  const key = f.src === 'cashbox' ? 'cashbox' : src && src.side === 'ally' ? src.key : 'enemy';
+  const key = f.src === 'cashbox' ? 'cashbox' : src && src.side === 'summon' ? 'moon' : src && src.side === 'ally' ? src.key : 'enemy';
   const a = center(s), b = center(t);
   const k = FXK();
   const hp = { x: b.x, y: b.r.top + b.r.height * (key === 'enemy' ? 0.45 : 0.55) };   // 命中點
@@ -2211,12 +2408,14 @@ function attackFx(f, s, t) {
       [-18, 0, 18].forEach((o, i) => slash({ x: hp.x + o, y: hp.y + o * 0.35 }, 64, '#ff4a3a', i * 45, 150, 5));
       setTimeout(() => { sparks(hp, '#d0142c', 14, 60); burst(hp, 'splat', '#b30f25', 0.5); }, 140 * k);
       break;
-    case 'mocha': {   // 冰晶飛彈 → 霜爆
-      const ang = Math.atan2(hp.y - a.y, hp.x - a.x);
-      for (let i = 0; i < 3; i++) {
-        setTimeout(() => fxDiv('shard', a.x + (i - 1) * 16, a.y, `--dx:${hp.x - a.x - (i - 1) * 16}px;--dy:${hp.y - a.y}px;--rot:${ang}rad;--c:#9fe4ff;animation-duration:${0.26 * k}s`, 300), i * 55 * k);
-      }
-      setTimeout(() => { burst(hp, 'frost', '#9fe4ff', 0.55); sparks(hp, '#d8f6ff', 12, 60); }, 360 * k);
+    case 'mocha': {   // 水管由左往右橫掃過目標 → 鏗的一聲金屬火花，管口甩出的水珠凍成冰晶
+      const pv = { x: hp.x - 24, y: hp.y + 128 }, len = 176;
+      const hit = pipeSwing(pv, len, -168, -12, 0.5, [hp])[0];
+      setTimeout(() => {
+        sparks(hp, '#fff2c8', 10, 70); burst(hp, 'frost', '#9fe4ff', 0.55); burst(hp, 'clang', '#ffffff', 0.25);
+        iceSpray(hp, 1);
+      }, hit);
+      Sound.play('pipeClang', { delay: hit / 1000 });
       break;
     }
     case 'alan': {    // 狙擊彈道 → 火焰爆炸
@@ -2247,6 +2446,28 @@ function attackFx(f, s, t) {
     case 'hanye': {       // 帶刻度的直線切割 → 方格
       fxDiv('rift', hp.x, hp.y, `--r:${(-35 + Math.random() * 70).toFixed(0)}deg;--c:#8fb4ff;animation-duration:${0.36 * k}s`, 450);
       setTimeout(() => { burst(hp, 'gridsq', '#8fb4ff', 0.45); sparks(hp, '#dfe8ff', 6, 40); }, 80 * k);
+      break;
+    }
+    case 'metonic':       // 默冬章：金色的光從天上傾瀉而下；月影：同樣的光，換成銀色
+    case 'moon': {        // 強化普攻＝兩人交替出手（偶數段默冬章、奇數段月影），最後一段櫻花盛開；春雷＝天上劈下的雷
+      if (f.vfx === 'thunder') { springBolt(hp, 1); Sound.play('springThunder'); break; }
+      const enh = f.vfx === 'spring' || f.vfx === 'springSide', seg = f.seg || 0;
+      const silver = enh ? seg % 2 === 1 : key === 'moon';
+      const col = silver ? '#e3e9ff' : '#ffd98a';
+      if (f.vfx === 'springSide') { skyFall({ x: hp.x + (silver ? 10 : -10), y: hp.y }, col, silver ? 14 : -14, 0.6); break; }
+      if (enh) {           // 出手的人輪流前傾：默冬章的卡片與左下角的月影
+        const W2 = viewState(), m = (W2.units || []).find(u => u.side === 'summon' && u.alive !== false);
+        const met = (W2.units || []).find(u => u.key === 'metonic');
+        s.classList.remove('lunge');
+        addCls(cardEl(silver ? m && m.id : met && met.id), silver ? 'moon-turn' : 'lunge');
+      }
+      const x = hp.x + (enh ? (silver ? 1 : -1) * (10 + (seg >> 1) % 3 * 9) : ((seg % 7) - 3) * 9);
+      skyFall({ x, y: hp.y }, col, enh ? (silver ? 16 : -16) : (key === 'moon' ? 9 : -9), 1);
+      if (!enh && seg === 0 && key === 'metonic') fxDiv('gearring', hp.x, hp.y, `--c:#d8bb8c;animation-duration:${0.7 * k}s`, 800);
+      setTimeout(() => { burst({ x, y: hp.y }, 'moonflare', col, enh ? 0.35 : 0.3); sparks({ x, y: hp.y }, col, 6, 45); }, 120 * k);
+      const tu = (W.units || []).find(u => u.id === f.tgt);
+      if (enh && (seg === 13 || tu && (tu.alive === false || tu.hp <= 0))) setTimeout(() => sakuraBloom(hp), 150 * k);
+      Sound.play('lightSeg', { silver, seg, gap: 0 });
       break;
     }
     case 'otg': {         // 鎖鏈抽向目標 → 纏著鎖鏈的手撕出交叉的血色裂口 → 血花與斷裂的鏈環
@@ -2289,7 +2510,7 @@ function attackFx(f, s, t) {
       slash(hp, 115 + Math.random() * 30, '#ff5a4c', 0, 150, 4);
       setTimeout(() => sparks(hp, '#ff7a6a', 8, 45), 60 * k);
   }
-  if (key !== 'cashbox') Sound.play('atk_' + key);
+  if (key !== 'cashbox' && !((key === 'metonic' || key === 'moon') && f.vfx)) Sound.play('atk_' + key);
   const hitAt = HIT_MS[key] || 80;
   Sound.play(key === 'enemy' ? 'hurt' : 'hit', { elem: f.elem, crit: f.crit, delay: hitAt * k / 1000, gap: 20 });
   setTimeout(() => addCls(t, key !== 'enemy' ? 'knock-up' : 'knock-down'), 120 * k);
@@ -2456,6 +2677,7 @@ function renderConfig() {
     ${chk('hanyeTechnique', '開場使用 寒夜 秘技【先驗】')}
     ${chk('markTechnique', '開場使用 馬克 秘技【心如止水】（隊伍第一位獲得斂藏）')}
     ${chk('otgTechnique', '開場使用 O.T.G. 秘技【原罪清算】（對生命值上限最高的敵人施放戰技，自身 2 層裂傷）')}
+    ${chk('metonicTechnique', '開場使用默冬章秘技【在那遙遠的北方】（獲得 7 層冬，並施放一次不消耗戰技點的戰技）')}
     ${chk('millerTechnique', '開場使用 米勒 秘技【今日，我們共聚一堂⋯⋯】（敵方全體告死）')}
     ${chk('cashbox', '啟用本質權能「兌現匣」')}
     ${chk('toughness', '啟用韌性與弱點擊破（舊機制，目前預設關閉）')}
@@ -2641,7 +2863,7 @@ function startBattle(opts) {
   if (!CFG.team.some(Boolean)) { alert('隊伍至少需要一名角色'); return; }
   if (!d && !CFG.enemies.length) { alert('至少需要一名敵人'); return; }
   clearCombatFx();
-  clearTimeout(playTimer); queue = []; playing = false; V = null; armed = null; ultQueue = [];
+  clearTimeout(playTimer); queue = []; playing = false; V = null; armed = null; clearInsertQueue();
   dungeonClaimed = false; battleRecorded = false;
   readyPrev = {}; endCued = false;
   shownLog = 0;
@@ -2659,7 +2881,7 @@ function resumeBattle(b) {
   activeDungeon = b.activeDungeon || null;
   dungeonClaimed = !!b.dungeonClaimed;
   battleRecorded = b.battleRecorded != null ? !!b.battleRecorded : Engine.state().phase !== 'input';
-  clearTimeout(playTimer); queue = []; playing = false; V = null; armed = null;
+  clearTimeout(playTimer); queue = []; playing = false; V = null; armed = null; clearInsertQueue();
   readyPrev = {}; endCued = ENDED.includes(Engine.state().phase);
   shownLog = Engine.state().log.length;
   renderLogFull();
@@ -2673,8 +2895,26 @@ function fireUlt() {
   armed = null;
   if (!id || !Engine.canUlt(id)) return renderBattle();
   const S = Engine.state();
-  if (!playing && (S.phase === 'input' || S.phase === 'between')) return run(() => Engine.ult(id));
-  if (!ultQueue.includes(id)) ultQueue.push(id);
+  if (!playing && !paused && !loomQueued && !ultQueue.length && (S.phase === 'input' || S.phase === 'between')) return run(() => Engine.ult(id));
+  if (!ultQueue.includes(id)) { ultQueue.push(id); insertOrder.push(id); }
+  renderBattle();
+  if (!playing) pump();
+}
+/** 時間織機與終結技共用插入窗口；播放中僅排隊，絕不快轉目前動作。 */
+function clearInsertQueue() { ultQueue = []; loomQueued = false; insertOrder = []; }
+function fireLoom() {
+  if (loomQueued) {
+    loomQueued = false;
+    insertOrder = insertOrder.filter(id => id !== 'loom');
+    renderBattle();
+    if (!playing && !pump()) scheduleAuto();
+    return;
+  }
+  const S = Engine.state(), W = viewState();
+  if (!S || ENDED.includes(S.phase) || !Engine.canLoom() || !W.loom || W.loom.charge < 1 - 1e-9) return;
+  clearTimeout(autoTimer);
+  if (!playing && !paused && !ultQueue.length && !insertOrder.length) return run(() => Engine.loom());
+  loomQueued = true; insertOrder.push('loom');
   renderBattle();
   if (!playing) pump();
 }
@@ -2789,7 +3029,7 @@ document.addEventListener('click', ev => {
       case 'undo':
         paused = false; $('#pausemenu').classList.add('hidden');
         clearCombatFx();
-        clearTimeout(playTimer); queue = []; playing = false; V = null; armed = null; ultQueue = [];
+        clearTimeout(playTimer); queue = []; playing = false; V = null; armed = null; clearInsertQueue();
         Engine.undo();
         battleRecorded = Engine.state().phase !== 'input' && battleRecorded;
         SaveSys.touch();
@@ -2813,7 +3053,7 @@ document.addEventListener('click', ev => {
       case 'fullscreen': return toggleFullscreen();
       case 'portraitok': document.body.classList.add('no-rotate-hint'); try { sessionStorage.setItem('portraitOk', '1'); } catch (e) { } return;
       case 'mute': Sound.set('muted', !Sound.pref.muted); return renderSoundCtl();
-      case 'loom': if (!playing && Engine.canLoom()) run(() => Engine.loom()); return;
+      case 'loom': return fireLoom();
       case 'ulttest': {
         const S = Engine.state();
         if (!S) return;
@@ -2838,7 +3078,7 @@ document.addEventListener('click', ev => {
   // 終結技：任何時候都能按（第一下蓄勢、第二下確認；已預約的再按一下取消預約）
   if (d.ult) {
     if (ENDED.includes(S.phase) || !Engine.canUlt(d.ult)) return;
-    if (ultQueue.includes(d.ult)) { ultQueue = ultQueue.filter(x => x !== d.ult); return renderBattle(); }
+    if (ultQueue.includes(d.ult)) { ultQueue = ultQueue.filter(x => x !== d.ult); insertOrder = insertOrder.filter(x => x !== d.ult); return renderBattle(); }
     if (armed === d.ult) return fireUlt();
     armed = d.ult;
     clearTimeout(autoTimer);

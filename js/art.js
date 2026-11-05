@@ -8,11 +8,14 @@
 const Art = (() => {
   // 莫卡兄弟有兩種素材：一張雙人圖（莫卡兄弟），或兄、弟分開的兩張圖。
   // 分開時兩人各自可用（mocha_elder / mocha_younger，短片裡使用），另外合成一張雙人圖給角色卡等地方當 mocha 使用。
-  const FILE = { longzhao: '龍爪', kane: '凱恩', mocha: '莫卡兄弟', mocha_elder: '莫卡兄弟-兄-代理執行', mocha_younger: '莫卡兄弟-弟-代理執行', alan: '阿蘭', gordon: '戈登', alexandra: '亞力山卓', alexandra_car: '亞力山卓與警車', police_car: '警車', otg: 'O.T.G.', raiden: '自律處刑官・「雷霆-09型」', raiden_phase2: '自律處刑官・「雷霆-09型」-第二階段', raiden_kane: '自律處刑官・「雷霆-09型」-異相凱恩', hanye: '寒夜', mark: '馬克', miller: '米勒' };
+  const FILE = { metonic: '默冬章', moon: '月影', metonic_duo: '默冬章與月影', longzhao: '龍爪', kane: '凱恩', mocha: '莫卡兄弟', mocha_elder: '莫卡兄弟-兄-代理執行', mocha_younger: '莫卡兄弟-弟-代理執行', alan: '阿蘭', gordon: '戈登', alexandra: '亞力山卓', alexandra_car: '亞力山卓與警車', police_car: '警車', otg: 'O.T.G.', raiden: '自律處刑官・「雷霆-09型」', raiden_phase2: '自律處刑官・「雷霆-09型」-第二階段', raiden_kane: '自律處刑官・「雷霆-09型」-異相凱恩', hanye: '寒夜', mark: '馬克', miller: '米勒' };
   // face = 臉部中心、bust = 上半身中心：大於 1 的數字是原圖像素座標，小於等於 1 是比例
   // bg：'white' 白底（預設）、'smooth' 平滑漸層的深色背景（以顏色連續性判斷背景）、
   //     'fade' 邊緣淡出、'whiteFade' 先去白邊再淡出、'alpha' 原圖已是透明背景（不處理）
   const FOCUS = {
+    metonic: { face: [0.54, 0.105], bust: [0.55, 0.30], bg: 'alpha' },
+    moon: { face: [0.59, 0.095], bust: [0.54, 0.31], bg: 'alpha' },
+    metonic_duo: { face: [0.52, 0.11], bust: [0.52, 0.35], faces: [[0.40,0.11],[0.64,0.11]], bg: 'alpha' },
     kane:          { face: [0.50, 0.115], bust: [0.50, 0.28], bg: 'alpha' },      // 永滅故事集、證物與交錯紅線
     mocha: { face: [0.53, 0.15], bust: [0.53, 0.38], faces: [[0.425,0.22],[0.635,0.09]], bg: 'alpha' },      // 已確認的多視角立繪
     mocha_elder:   { face: [0.55, 0.145], bust: [0.53, 0.34], bg: 'alpha' },
